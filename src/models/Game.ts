@@ -464,16 +464,22 @@ export class Game {
     this.players.forEach(player => player.resetForNewRound());
     this.currentBet = 0;
     
-    // Create side pots if needed
-    this.potManager.createSidePots(this.players);
+    // Only create side pots if there are all-in players
+    const hasAllInPlayers = this.players.some(p => p.status === PlayerStatus.ALL_IN);
+    if (hasAllInPlayers) {
+      this.potManager.createSidePots(this.players);
+    }
     
     // Determine who acts first in the new round
     this.determineFirstActor();
   }
 
   endHand(winnerIds: string[]): void {
-    // Create final side pots
-    this.potManager.createSidePots(this.players);
+    // Only create side pots if there are all-in players
+    const hasAllInPlayers = this.players.some(p => p.status === PlayerStatus.ALL_IN);
+    if (hasAllInPlayers) {
+      this.potManager.createSidePots(this.players);
+    }
     
     // Distribute pots to winners
     const distributions = this.potManager.distributePots({

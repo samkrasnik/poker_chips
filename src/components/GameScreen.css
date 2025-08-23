@@ -69,6 +69,33 @@
   margin: 0;
 }
 
+.betting-round-indicator {
+  margin-top: 15px;
+  padding: 10px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-weight: bold;
+}
+
+.round-label {
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+.round-number {
+  font-size: 24px;
+  color: #fff;
+}
+
+.round-name {
+  font-size: 16px;
+  opacity: 0.95;
+}
+
 .side-pots {
   margin-top: 15px;
   display: flex;
@@ -85,10 +112,39 @@
 }
 
 .players-container {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  display: flex;
+  overflow-x: auto;
   gap: 15px;
   margin-bottom: 30px;
+  padding-bottom: 10px;
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+}
+
+/* Make sure cards don't shrink */
+.players-container > * {
+  flex: 0 0 auto;
+  min-width: 250px;
+}
+
+/* Show scroll indicator on mobile */
+@media (max-width: 768px) {
+  .players-container {
+    padding-bottom: 15px;
+  }
+  
+  .players-container::-webkit-scrollbar {
+    height: 6px;
+  }
+  
+  .players-container::-webkit-scrollbar-track {
+    background: #333;
+    border-radius: 3px;
+  }
+  
+  .players-container::-webkit-scrollbar-thumb {
+    background: #666;
+    border-radius: 3px;
+  }
 }
 
 .bottom-actions {

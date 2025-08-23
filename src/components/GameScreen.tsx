@@ -85,6 +85,18 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
         <div className="main-pot">
           <h2>Total Pot: ${potTotal}</h2>
         </div>
+        {currentGame.status === GameStatus.IN_PROGRESS && (
+          <div className="betting-round-indicator">
+            <span className="round-label">BETTING ROUND</span>
+            <span className="round-number">{currentGame.currentRound + 1}</span>
+            <span className="round-name">
+              {currentGame.currentRound === 0 && '(Pre-flop)'}
+              {currentGame.currentRound === 1 && '(Flop)'}
+              {currentGame.currentRound === 2 && '(Turn)'}
+              {currentGame.currentRound === 3 && '(River)'}
+            </span>
+          </div>
+        )}
         {pots.length > 1 && (
           <div className="side-pots">
             {pots.map((pot, index) => (

@@ -23,6 +23,19 @@ export class PotManager {
   }
 
   createSidePots(players: any[]): void {
+    // Only create side pots if there's an all-in player
+    const hasAllIn = players.some(p => p.status === 'all_in');
+    if (!hasAllIn) {
+      // Just create a single main pot with all contributions
+      this.pots = [{
+        id: Math.random().toString(36).substr(2, 9),
+        amount: this.totalPot,
+        eligiblePlayers: Array.from(this.playerContributions.keys()),
+        isMain: true
+      }];
+      return;
+    }
+    
     this.pots = [];
     
     // Get all contribution amounts and sort them
