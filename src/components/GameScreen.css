@@ -258,3 +258,52 @@
 .modal-actions button:hover {
   opacity: 0.9;
 }
+
+/* Pot-specific winner selection styles */
+.pots-list {
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 10px 0;
+}
+
+.pot-section {
+  background: #333;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 20px;
+  border: 2px solid transparent;
+}
+
+.pot-section:hover {
+  border-color: #4CAF50;
+}
+
+.pot-section h3 {
+  color: #4CAF50;
+  margin-bottom: 10px;
+  font-size: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.eligible-note {
+  color: #aaa;
+  font-size: 14px;
+  margin-bottom: 15px;
+  padding: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-style: italic;
+}
+
+.winner-modal {
+  max-width: 600px;
+}
+
+.winner-modal h2 {
+  color: #4CAF50;
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 24px;
+}

@@ -475,16 +475,41 @@ export class Game {
   }
 
   endHand(winnerIds: string[]): void {
-    // Only create side pots if there are all-in players
-    const hasAllInPlayers = this.players.some(p => p.status === PlayerStatus.ALL_IN);
-    if (hasAllInPlayers) {
-      this.potManager.createSidePots(this.players);
-    }
+    // Always create pots (either side pots or a single main pot)
+    this.potManager.createSidePots(this.players);
     
     // Distribute pots to winners
     const distributions = this.potManager.distributePots({
       default: winnerIds
     });
+    
+    // Add winnings to player stacks
+    distributions.forEach(dist => {
+      Object.entries(dist.distribution).forEach(([playerId, amount]) => {
+        const player = this.players.find(p => p.id === playerId);
+        if (player) {
+          player.addChips(amount as number);
+        }
+      });
+    });
+    
+    // Reset game status
+    this.status = GameStatus.WAITING;
+    
+    // Reset all players for next hand
+    this.players.forEach(player => {
+      player.resetForNewHand();
+      player.isSmallBlind = false;
+      player.isBigBlind = false;
+    });
+  }
+
+  endHandWithPots(potWinners: { [potId: string]: string[] }): void {
+    // Always create pots (either side pots or a single main pot)
+    this.potManager.createSidePots(this.players);
+    
+    // Distribute pots to specific winners
+    const distributions = this.potManager.distributePots(potWinners);
     
     // Add winnings to player stacks
     distributions.forEach(dist => {

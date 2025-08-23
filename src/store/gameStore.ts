@@ -11,6 +11,7 @@ interface GameStore {
   startHand: () => void;
   performAction: (playerId: string, action: ActionType, amount?: number) => void;
   endHand: (winnerIds: string[]) => void;
+  endHandWithPots: (potWinners: { [potId: string]: string[] }) => void;
   editPlayerStack: (playerId: string, newStack: number) => void;
   rebuyPlayer: (playerId: string, amount: number) => void;
   resetGame: () => void;
@@ -97,6 +98,21 @@ const useGameStore = create<GameStore>()(
         });
       } catch (error) {
         console.error('Failed to end hand:', error);
+        throw error;
+      }
+    },
+
+    endHandWithPots: (potWinners: { [potId: string]: string[] }) => {
+      const game = get().currentGame;
+      if (!game) return;
+      
+      try {
+        game.endHandWithPots(potWinners);
+        set(state => {
+          state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
+        });
+      } catch (error) {
+        console.error('Failed to end hand with pots:', error);
         throw error;
       }
     },

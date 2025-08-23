@@ -11,9 +11,9 @@ interface GameScreenProps {
 }
 
 const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
-  const { currentGame, startHand, performAction, endHand } = useGameStore();
+  const { currentGame, startHand, performAction, endHand, endHandWithPots } = useGameStore();
   const [showWinnerModal, setShowWinnerModal] = useState(false);
-  const [selectedWinners, setSelectedWinners] = useState<string[]>([]);
+  const [potWinners, setPotWinners] = useState<{ [potId: string]: string[] }>({});
 
   if (!currentGame) {
     return (
@@ -48,25 +48,53 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
   };
 
   const handleEndHand = () => {
+    // Force creation of pots before showing modal
+    if (currentGame.potManager.pots.length === 0) {
+      currentGame.potManager.createSidePots(currentGame.players);
+    }
+    
+    // Initialize pot winners for each pot
+    const initialPotWinners: { [potId: string]: string[] } = {};
+    const currentPots = currentGame.potManager.pots;
+    
+    if (currentPots.length > 0) {
+      currentPots.forEach(pot => {
+        initialPotWinners[pot.id] = [];
+      });
+    } else {
+      // Fallback - should not happen now
+      initialPotWinners['default'] = [];
+    }
+    setPotWinners(initialPotWinners);
     setShowWinnerModal(true);
   };
 
   const selectWinners = () => {
-    if (selectedWinners.length === 0) {
-      alert('Please select at least one winner');
+    // Check if at least one pot has winners
+    const hasWinners = Object.values(potWinners).some(winners => winners.length > 0);
+    if (!hasWinners) {
+      alert('Please select at least one winner for at least one pot');
       return;
     }
-    endHand(selectedWinners);
-    setSelectedWinners([]);
+    
+    // Pass the pot-specific winners to endHandWithPots
+    endHandWithPots(potWinners);
+    setPotWinners({});
     setShowWinnerModal(false);
   };
 
-  const toggleWinner = (playerId: string) => {
-    if (selectedWinners.includes(playerId)) {
-      setSelectedWinners(selectedWinners.filter(id => id !== playerId));
-    } else {
-      setSelectedWinners([...selectedWinners, playerId]);
-    }
+  const toggleWinnerForPot = (potId: string, playerId: string) => {
+    setPotWinners(prev => {
+      const currentWinners = prev[potId] || [];
+      const newWinners = currentWinners.includes(playerId)
+        ? currentWinners.filter(id => id !== playerId)
+        : [...currentWinners, playerId];
+      
+      return {
+        ...prev,
+        [potId]: newWinners
+      };
+    });
   };
 
   return (
@@ -147,28 +175,73 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
 
       {showWinnerModal && (
         <div className="modal-overlay" onClick={() => setShowWinnerModal(false)}>
-          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
-            <h2>Select Winner(s)</h2>
-            <div className="winner-list">
-              {currentGame.getPlayersInHand().map(player => (
-                <div
-                  key={player.id}
-                  className={`winner-option ${selectedWinners.includes(player.id) ? 'selected' : ''}`}
-                  onClick={() => toggleWinner(player.id)}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedWinners.includes(player.id)}
-                    onChange={() => toggleWinner(player.id)}
-                  />
-                  <span>{player.name} (${player.stack + player.currentBet})</span>
+          <div className="modal-content winner-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Select Winners for Each Pot</h2>
+            
+            {currentGame.potManager.pots.length > 1 ? (
+              // Multiple pots - show each separately
+              <div className="pots-list">
+                {currentGame.potManager.pots.map((pot, index) => {
+                  const eligiblePlayers = currentGame.players.filter(p => 
+                    pot.eligiblePlayers.includes(p.id) && 
+                    p.status !== PlayerStatus.FOLDED
+                  );
+                  
+                  return (
+                    <div key={pot.id} className="pot-section">
+                      <h3>
+                        {pot.isMain ? 'Main Pot' : `Side Pot ${index}`}: ${pot.amount}
+                      </h3>
+                      <div className="eligible-note">
+                        Eligible: {eligiblePlayers.map(p => p.name).join(', ')}
+                      </div>
+                      <div className="winner-list">
+                        {eligiblePlayers.map(player => (
+                          <div
+                            key={player.id}
+                            className={`winner-option ${(potWinners[pot.id] || []).includes(player.id) ? 'selected' : ''}`}
+                            onClick={() => toggleWinnerForPot(pot.id, player.id)}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={(potWinners[pot.id] || []).includes(player.id)}
+                              onChange={() => toggleWinnerForPot(pot.id, player.id)}
+                            />
+                            <span>{player.name} (Stack: ${player.stack})</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              // Single pot - simpler display
+              <div className="pot-section">
+                <h3>Pot: ${currentGame.potManager.pots[0]?.amount || potTotal}</h3>
+                <div className="winner-list">
+                  {currentGame.getPlayersInHand().map(player => (
+                    <div
+                      key={player.id}
+                      className={`winner-option ${(potWinners[currentGame.potManager.pots[0]?.id || 'default'] || []).includes(player.id) ? 'selected' : ''}`}
+                      onClick={() => toggleWinnerForPot(currentGame.potManager.pots[0]?.id || 'default', player.id)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(potWinners[currentGame.potManager.pots[0]?.id || 'default'] || []).includes(player.id)}
+                        onChange={() => toggleWinnerForPot(currentGame.potManager.pots[0]?.id || 'default', player.id)}
+                      />
+                      <span>{player.name} (Stack: ${player.stack})</span>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
+              </div>
+            )}
+            
             <div className="modal-actions">
               <button onClick={() => setShowWinnerModal(false)}>Cancel</button>
               <button onClick={selectWinners} className="confirm-button">
-                Distribute Pot
+                Distribute Pots
               </button>
             </div>
           </div>
