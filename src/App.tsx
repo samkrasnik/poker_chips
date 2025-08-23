@@ -1,24 +1,18 @@
-import React from 'react';
-import logo from './logo.svg';
+import React, { useState } from 'react';
+import SetupScreen from './components/SetupScreen';
+import GameScreen from './components/GameScreen';
 import './App.css';
 
 function App() {
+  const [currentScreen, setCurrentScreen] = useState<'setup' | 'game'>('setup');
+
   return (
     <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+      {currentScreen === 'setup' ? (
+        <SetupScreen onGameCreated={() => setCurrentScreen('game')} />
+      ) : (
+        <GameScreen onBack={() => setCurrentScreen('setup')} />
+      )}
     </div>
   );
 }

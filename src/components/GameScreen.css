@@ -1,0 +1,204 @@
+.game-screen {
+  min-height: 100vh;
+  background: #1a1a1a;
+  color: white;
+  padding: 20px;
+}
+
+.no-game {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+}
+
+.no-game h2 {
+  margin-bottom: 20px;
+}
+
+.no-game button {
+  padding: 12px 24px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.game-header {
+  margin-bottom: 30px;
+}
+
+.back-button {
+  padding: 8px 16px;
+  background: #333;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  margin-bottom: 10px;
+}
+
+.back-button:hover {
+  background: #444;
+}
+
+.game-header h1 {
+  margin: 10px 0;
+}
+
+.game-info {
+  display: flex;
+  gap: 20px;
+  color: #aaa;
+  font-size: 14px;
+}
+
+.pot-container {
+  background: #2a2a2a;
+  border-radius: 8px;
+  padding: 20px;
+  margin-bottom: 30px;
+  text-align: center;
+}
+
+.main-pot h2 {
+  color: #4CAF50;
+  margin: 0;
+}
+
+.side-pots {
+  margin-top: 15px;
+  display: flex;
+  gap: 15px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.side-pot {
+  background: #3a3a3a;
+  padding: 8px 16px;
+  border-radius: 4px;
+  font-size: 14px;
+}
+
+.players-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 15px;
+  margin-bottom: 30px;
+}
+
+.bottom-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1a1a1a;
+  padding: 20px;
+  border-top: 1px solid #333;
+  display: flex;
+  justify-content: center;
+}
+
+.start-hand-button,
+.end-hand-button {
+  padding: 15px 40px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 18px;
+  font-weight: bold;
+  cursor: pointer;
+}
+
+.start-hand-button:hover,
+.end-hand-button:hover {
+  background: #45a049;
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: #2a2a2a;
+  border-radius: 12px;
+  padding: 30px;
+  width: 90%;
+  max-width: 500px;
+}
+
+.modal-content h2 {
+  margin-bottom: 20px;
+}
+
+.winner-list {
+  margin-bottom: 30px;
+}
+
+.winner-option {
+  background: #3a3a3a;
+  padding: 15px;
+  margin-bottom: 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: all 0.2s;
+}
+
+.winner-option:hover {
+  background: #444;
+}
+
+.winner-option.selected {
+  background: #4CAF50;
+}
+
+.winner-option input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: flex-end;
+}
+
+.modal-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 16px;
+}
+
+.modal-actions button:first-child {
+  background: #555;
+  color: white;
+}
+
+.modal-actions .confirm-button {
+  background: #4CAF50;
+  color: white;
+}
+
+.modal-actions button:hover {
+  opacity: 0.9;
+}
