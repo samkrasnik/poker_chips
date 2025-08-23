@@ -308,6 +308,8 @@ export class Game {
     // Check if only one player remains
     const remainingPlayers = this.getPlayersInHand();
     if (remainingPlayers.length === 1) {
+      // Create pots before ending hand
+      this.potManager.createSidePots(this.players);
       this.endHand([remainingPlayers[0].id]);
       return;
     }
@@ -457,6 +459,8 @@ export class Game {
     
     if (this.currentRound >= this.totalRounds) {
       this.status = GameStatus.HAND_COMPLETE;
+      // Create final pots when hand is complete
+      this.potManager.createSidePots(this.players);
       return;
     }
     
@@ -475,8 +479,10 @@ export class Game {
   }
 
   endHand(winnerIds: string[]): void {
-    // Always create pots (either side pots or a single main pot)
-    this.potManager.createSidePots(this.players);
+    // Don't recreate pots if they already exist
+    if (this.potManager.pots.length === 0) {
+      this.potManager.createSidePots(this.players);
+    }
     
     // Distribute pots to winners
     const distributions = this.potManager.distributePots({
@@ -496,6 +502,9 @@ export class Game {
     // Reset game status
     this.status = GameStatus.WAITING;
     
+    // Reset pot manager after distribution
+    this.potManager.reset();
+    
     // Reset all players for next hand
     this.players.forEach(player => {
       player.resetForNewHand();
@@ -505,24 +514,37 @@ export class Game {
   }
 
   endHandWithPots(potWinners: { [potId: string]: string[] }): void {
-    // Always create pots (either side pots or a single main pot)
-    this.potManager.createSidePots(this.players);
+    // Don't recreate pots - they should already exist!
+    // If no pots exist, create them
+    if (this.potManager.pots.length === 0) {
+      this.potManager.createSidePots(this.players);
+    }
+    
+    console.log('Pots:', this.potManager.pots);
+    console.log('Pot winners:', potWinners);
     
     // Distribute pots to specific winners
     const distributions = this.potManager.distributePots(potWinners);
+    
+    console.log('Distributions:', distributions);
     
     // Add winnings to player stacks
     distributions.forEach(dist => {
       Object.entries(dist.distribution).forEach(([playerId, amount]) => {
         const player = this.players.find(p => p.id === playerId);
         if (player) {
+          console.log(`Adding ${amount} chips to ${player.name} (was ${player.stack})`);
           player.addChips(amount as number);
+          console.log(`${player.name} now has ${player.stack}`);
         }
       });
     });
     
     // Reset game status
     this.status = GameStatus.WAITING;
+    
+    // Reset pot manager after distribution
+    this.potManager.reset();
     
     // Reset all players for next hand
     this.players.forEach(player => {

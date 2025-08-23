@@ -74,9 +74,16 @@ export class PotManager {
   distributePots(winners: { [potId: string]: string[] }): any[] {
     const distributions = [];
     
+    console.log('distributePots called with:', winners);
+    console.log('Current pots:', this.pots);
+    
     for (const pot of this.pots) {
       const potWinners = winners[pot.id] || winners['default'] || [];
+      console.log(`Pot ${pot.id}: looking for winners`, potWinners);
+      console.log(`Pot ${pot.id}: eligible players`, pot.eligiblePlayers);
+      
       const winnersInPot = potWinners.filter(w => pot.eligiblePlayers.includes(w));
+      console.log(`Pot ${pot.id}: winners in pot`, winnersInPot);
       
       if (winnersInPot.length > 0) {
         const amountPerWinner = Math.floor(pot.amount / winnersInPot.length);

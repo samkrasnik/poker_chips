@@ -48,11 +48,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
   };
 
   const handleEndHand = () => {
-    // Force creation of pots before showing modal
-    if (currentGame.potManager.pots.length === 0) {
-      currentGame.potManager.createSidePots(currentGame.players);
-    }
-    
+    // Pots should already be created by the game logic
     // Initialize pot winners for each pot
     const initialPotWinners: { [potId: string]: string[] } = {};
     const currentPots = currentGame.potManager.pots;
@@ -76,6 +72,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
       alert('Please select at least one winner for at least one pot');
       return;
     }
+    
+    console.log('Calling endHandWithPots with:', potWinners);
+    console.log('Current pots:', currentGame.potManager.pots);
     
     // Pass the pot-specific winners to endHandWithPots
     endHandWithPots(potWinners);

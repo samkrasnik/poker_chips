@@ -1,5 +1,4 @@
 import { create } from 'zustand';
-import { immer } from 'zustand/middleware/immer';
 import { Game, GameStatus, ActionType, GameConfig } from '../models/Game';
 import { PlayerStatus } from '../models/Player';
 
@@ -17,14 +16,12 @@ interface GameStore {
   resetGame: () => void;
 }
 
-const useGameStore = create<GameStore>()(
-  immer((set, get) => ({
+const useGameStore = create<GameStore>()((set, get) => ({
     currentGame: null,
 
     createNewGame: (config: GameConfig) => {
-      set(state => {
-        state.currentGame = new Game(config);
-      });
+      const newGame = new Game(config);
+      set({ currentGame: newGame });
     },
 
     addPlayer: (name: string, seatNumber?: number, stack?: number) => {
@@ -33,9 +30,8 @@ const useGameStore = create<GameStore>()(
       
       try {
         game.addPlayer(name, seatNumber || null, stack || null);
-        set(state => {
-          state.currentGame = game;
-        });
+        // Force re-render by creating new reference with proper prototype
+        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
       } catch (error) {
         console.error('Failed to add player:', error);
         throw error;
@@ -48,9 +44,7 @@ const useGameStore = create<GameStore>()(
       
       try {
         game.removePlayer(playerId);
-        set(state => {
-          state.currentGame = game;
-        });
+        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
       } catch (error) {
         console.error('Failed to remove player:', error);
         throw error;
@@ -63,9 +57,7 @@ const useGameStore = create<GameStore>()(
       
       try {
         game.startHand();
-        set(state => {
-          state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
-        });
+        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
       } catch (error) {
         console.error('Failed to start hand:', error);
         throw error;
@@ -78,9 +70,7 @@ const useGameStore = create<GameStore>()(
       
       try {
         game.performAction(playerId, action, amount || 0);
-        set(state => {
-          state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
-        });
+        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
       } catch (error) {
         console.error('Failed to perform action:', error);
         throw error;
@@ -93,9 +83,7 @@ const useGameStore = create<GameStore>()(
       
       try {
         game.endHand(winnerIds);
-        set(state => {
-          state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
-        });
+        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
       } catch (error) {
         console.error('Failed to end hand:', error);
         throw error;
@@ -108,9 +96,7 @@ const useGameStore = create<GameStore>()(
       
       try {
         game.endHandWithPots(potWinners);
-        set(state => {
-          state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
-        });
+        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
       } catch (error) {
         console.error('Failed to end hand with pots:', error);
         throw error;
@@ -140,9 +126,7 @@ const useGameStore = create<GameStore>()(
         player.status = PlayerStatus.ELIMINATED;
       }
       
-      set(state => {
-        state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
-      });
+      set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
     },
 
     rebuyPlayer: (playerId: string, amount: number) => {
@@ -164,17 +148,12 @@ const useGameStore = create<GameStore>()(
         player.status = PlayerStatus.ACTIVE;
       }
       
-      set(state => {
-        state.currentGame = Object.assign(Object.create(Object.getPrototypeOf(game)), game);
-      });
+      set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
     },
 
     resetGame: () => {
-      set(state => {
-        state.currentGame = null;
-      });
+      set({ currentGame: null });
     }
-  }))
-);
+  }));
 
 export default useGameStore;
