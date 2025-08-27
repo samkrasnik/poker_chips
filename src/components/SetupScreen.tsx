@@ -8,7 +8,8 @@ interface SetupScreenProps {
 }
 
 const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
-  const { createNewGame, addPlayer } = useGameStore();
+  const { createNewGame, addPlayer, getSavedGames, loadGame } = useGameStore();
+  const [showLoadModal, setShowLoadModal] = useState(false);
   
   const [gameName, setGameName] = useState(`Game ${new Date().toLocaleDateString()}`);
   const [maxPlayers, setMaxPlayers] = useState('9');
@@ -36,6 +37,11 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
     const newPlayers = [...players];
     newPlayers[index][field] = value;
     setPlayers(newPlayers);
+  };
+
+  const handleLoad = (saveId: string) => {
+    loadGame(saveId);
+    onGameCreated();
   };
 
   const handleCreateGame = () => {
@@ -71,7 +77,14 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
 
   return (
     <div className="setup-screen">
-      <h1>New Game Setup</h1>
+      <div className="setup-header">
+        <h1>New Game Setup</h1>
+        {getSavedGames().length > 0 && (
+          <button className="load-game-button" onClick={() => setShowLoadModal(true)}>
+            📁 Load Saved Game
+          </button>
+        )}
+      </div>
       
       <div className="form-section">
         <h2>Game Settings</h2>
@@ -219,6 +232,29 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
       <button className="create-game-button" onClick={handleCreateGame}>
         Create Game
       </button>
+      
+      {/* Load Game Modal */}
+      {showLoadModal && (
+        <div className="modal-overlay" onClick={() => setShowLoadModal(false)}>
+          <div className="modal-content load-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Load Saved Game</h2>
+            <div className="saved-games-list">
+              {getSavedGames().map(save => (
+                <div key={save.id} className="saved-game-item">
+                  <div className="save-info">
+                    <div className="save-name">{save.name}</div>
+                    <div className="save-date">{new Date(save.savedAt).toLocaleString()}</div>
+                  </div>
+                  <button onClick={() => handleLoad(save.id)} className="load-btn">Load</button>
+                </div>
+              ))}
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowLoadModal(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

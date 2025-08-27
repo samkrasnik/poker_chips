@@ -24,6 +24,7 @@ export class Player {
   currentBet: number;
   status: PlayerStatus;
   hasActed: boolean;
+  hasActedVoluntarily: boolean;
   isDealer: boolean;
   isSmallBlind: boolean;
   isBigBlind: boolean;
@@ -42,6 +43,7 @@ export class Player {
     this.currentBet = 0;
     this.status = PlayerStatus.ACTIVE;
     this.hasActed = false;
+    this.hasActedVoluntarily = false;
     this.isDealer = false;
     this.isSmallBlind = false;
     this.isBigBlind = false;
@@ -74,6 +76,7 @@ export class Player {
   resetForNewHand(): void {
     this.currentBet = 0;
     this.hasActed = false;
+    this.hasActedVoluntarily = false;
     this.status = this.stack > 0 ? PlayerStatus.ACTIVE : PlayerStatus.ELIMINATED;
     this.actionHistory = [];
   }

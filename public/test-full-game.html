@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Full Game Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        #log {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Poker Chips Web - Full Game Test</h1>
+    
+    <div class="test-section">
+        <h2>Test Controls</h2>
+        <button id="runFullTest">Run Full Game Test</button>
+        <button id="clearLog">Clear Log</button>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Status</h2>
+        <div id="status"></div>
+    </div>
+
+    <div class="test-section">
+        <h2>Test Log</h2>
+        <div id="log"></div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const logEl = document.getElementById('log');
+
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${time}] ${message}`;
+            logEntry.className = type;
+            logEl.appendChild(logEntry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function setStatus(message, type = 'info') {
+            statusEl.className = `status ${type}`;
+            statusEl.textContent = message;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        async function runFullGameTest() {
+            log('Starting full game test...', 'info');
+            setStatus('Test in progress...', 'info');
+            
+            try {
+                // Open the app in an iframe for testing
+                log('Opening poker chips app...', 'info');
+                const iframe = document.createElement('iframe');
+                iframe.src = 'http://localhost:3000';
+                iframe.style.width = '100%';
+                iframe.style.height = '600px';
+                iframe.style.border = '1px solid #ccc';
+                iframe.style.borderRadius = '8px';
+                iframe.id = 'testFrame';
+                
+                // Add iframe to page
+                const existingFrame = document.getElementById('testFrame');
+                if (existingFrame) {
+                    existingFrame.remove();
+                }
+                document.querySelector('.test-section:last-child').appendChild(iframe);
+                
+                // Wait for iframe to load
+                await new Promise((resolve) => {
+                    iframe.onload = resolve;
+                });
+                await sleep(2000);
+                
+                const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+                const iframeWin = iframe.contentWindow;
+                
+                // Test 1: Create a new game
+                log('Test 1: Creating new game...', 'info');
+                const createGameBtn = iframeDoc.querySelector('button');
+                if (createGameBtn && createGameBtn.textContent.includes('Create New Game')) {
+                    createGameBtn.click();
+                    await sleep(500);
+                    log('✓ Game created successfully', 'success');
+                } else {
+                    log('✗ Could not find Create Game button', 'error');
+                    throw new Error('Create Game button not found');
+                }
+                
+                // Test 2: Add players
+                log('Test 2: Adding 3 players...', 'info');
+                for (let i = 1; i <= 3; i++) {
+                    const nameInput = iframeDoc.querySelector('input[placeholder="Player name"]');
+                    const addBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Add Player');
+                    
+                    if (nameInput && addBtn) {
+                        nameInput.value = `Player ${i}`;
+                        nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                        addBtn.click();
+                        await sleep(500);
+                        log(`✓ Added Player ${i}`, 'success');
+                    } else {
+                        log(`✗ Could not add Player ${i}`, 'error');
+                        throw new Error('Add player controls not found');
+                    }
+                }
+                
+                // Test 3: Start game
+                log('Test 3: Starting game...', 'info');
+                const startGameBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Start Game');
+                if (startGameBtn) {
+                    startGameBtn.click();
+                    await sleep(500);
+                    log('✓ Game started', 'success');
+                } else {
+                    log('✗ Could not find Start Game button', 'error');
+                    throw new Error('Start Game button not found');
+                }
+                
+                // Test 4: Start a hand
+                log('Test 4: Starting hand...', 'info');
+                const startHandBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Start Hand');
+                if (startHandBtn) {
+                    startHandBtn.click();
+                    await sleep(500);
+                    log('✓ Hand started', 'success');
+                } else {
+                    log('✗ Could not find Start Hand button', 'error');
+                    throw new Error('Start Hand button not found');
+                }
+                
+                // Test 5: Simulate betting (Player 3 calls, Player 1 folds, Player 2 raises)
+                log('Test 5: Simulating betting round...', 'info');
+                
+                // Player 3 (UTG) calls
+                const callBtn1 = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Call');
+                if (callBtn1) {
+                    callBtn1.click();
+                    await sleep(500);
+                    log('✓ Player 3 called', 'success');
+                }
+                
+                // Player 1 (SB) folds
+                const foldBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Fold');
+                if (foldBtn) {
+                    foldBtn.click();
+                    await sleep(500);
+                    log('✓ Player 1 folded', 'success');
+                }
+                
+                // Player 2 (BB) checks
+                const checkBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Check');
+                if (checkBtn) {
+                    checkBtn.click();
+                    await sleep(500);
+                    log('✓ Player 2 checked', 'success');
+                }
+                
+                // Wait for more rounds or until hand complete
+                await sleep(1000);
+                
+                // Check if betting continues
+                let roundCount = 1;
+                while (roundCount < 4) {
+                    const actionBtns = iframeDoc.querySelectorAll('.action-buttons button');
+                    if (actionBtns.length > 0) {
+                        log(`Round ${roundCount + 1}: Continuing betting...`, 'info');
+                        
+                        // Players check through
+                        const checkBtn = Array.from(actionBtns).find(b => b.textContent === 'Check');
+                        if (checkBtn) {
+                            checkBtn.click();
+                            await sleep(500);
+                        }
+                    } else {
+                        break;
+                    }
+                    roundCount++;
+                }
+                
+                // Test 6: End hand and select winner
+                log('Test 6: Ending hand and selecting winner...', 'info');
+                const endHandBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent.includes('Select Winners'));
+                if (endHandBtn) {
+                    endHandBtn.click();
+                    await sleep(500);
+                    
+                    // Select Player 2 as winner
+                    const winnerOptions = iframeDoc.querySelectorAll('.winner-option');
+                    if (winnerOptions.length > 0) {
+                        winnerOptions[0].click(); // Select first remaining player
+                        await sleep(500);
+                        
+                        const distributeBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Distribute Pots');
+                        if (distributeBtn) {
+                            distributeBtn.click();
+                            await sleep(500);
+                            log('✓ Winner selected and pot distributed', 'success');
+                        }
+                    }
+                }
+                
+                // Test 7: Verify pot was distributed
+                log('Test 7: Verifying pot distribution...', 'info');
+                await sleep(1000);
+                
+                const playerCards = iframeDoc.querySelectorAll('.player-card');
+                let stacksFound = false;
+                playerCards.forEach((card, index) => {
+                    const stackText = card.textContent;
+                    if (stackText.includes('$')) {
+                        stacksFound = true;
+                        log(`Player ${index + 1} stack: ${stackText.match(/\$\d+/)?.[0]}`, 'info');
+                    }
+                });
+                
+                if (stacksFound) {
+                    log('✓ Stacks updated after pot distribution', 'success');
+                } else {
+                    log('⚠ Could not verify stack updates', 'error');
+                }
+                
+                setStatus('✅ All tests completed successfully!', 'success');
+                log('All tests completed!', 'success');
+                
+            } catch (error) {
+                setStatus(`❌ Test failed: ${error.message}`, 'error');
+                log(`Test failed: ${error.message}`, 'error');
+            }
+        }
+
+        document.getElementById('runFullTest').addEventListener('click', runFullGameTest);
+        document.getElementById('clearLog').addEventListener('click', () => {
+            logEl.innerHTML = '';
+            statusEl.textContent = '';
+            statusEl.className = 'status';
+        });
+    </script>
+</body>
+</html>

@@ -4,10 +4,32 @@
   padding: 20px;
 }
 
+.setup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
 .setup-screen h1 {
   text-align: center;
   color: #333;
-  margin-bottom: 30px;
+  margin: 0;
+}
+
+.load-game-button {
+  padding: 10px 20px;
+  background: #9C27B0;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+}
+
+.load-game-button:hover {
+  background: #7B1FA2;
 }
 
 .form-section {

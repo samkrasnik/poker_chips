@@ -1,9 +1,31 @@
 import { create } from 'zustand';
 import { Game, GameStatus, ActionType, GameConfig } from '../models/Game';
-import { PlayerStatus } from '../models/Player';
+import { Player, PlayerStatus } from '../models/Player';
+import { PotManager } from '../models/Pot';
+
+interface SavedGame {
+  id: string;
+  name: string;
+  savedAt: number;
+  gameState: string;
+}
+
+interface PlayerStats {
+  playerName: string;
+  handsPlayed: number;
+  handsWon: number;
+  totalProfit: number;
+  vpip: number; // Voluntary Put money In Pot percentage
+  startingStack: number;
+}
 
 interface GameStore {
   currentGame: Game | null;
+  gameHistory: string[];
+  historyIndex: number;
+  savedGames: SavedGame[];
+  playerStats: Map<string, PlayerStats>;
+  stacksBeforeHand: Map<string, number> | null;
   createNewGame: (config: GameConfig) => void;
   addPlayer: (name: string, seatNumber?: number, stack?: number) => void;
   removePlayer: (playerId: string) => void;
@@ -14,14 +36,121 @@ interface GameStore {
   editPlayerStack: (playerId: string, newStack: number) => void;
   rebuyPlayer: (playerId: string, amount: number) => void;
   resetGame: () => void;
+  undo: () => void;
+  canUndo: () => boolean;
+  saveGame: (name?: string) => void;
+  loadGame: (saveId: string) => void;
+  deleteSavedGame: (saveId: string) => void;
+  getSavedGames: () => SavedGame[];
+  getPlayerStats: () => PlayerStats[];
+  updatePlayerStats: () => void;
+  loadSavedGamesFromStorage: () => void;
+  loadPlayerStatsFromStorage: () => void;
+  savePlayerStatsToStorage: () => void;
 }
+
+const MAX_HISTORY = 50;
+const MAX_SAVED_GAMES = 3;
+const STORAGE_KEY_SAVED_GAMES = 'poker_saved_games';
+const STORAGE_KEY_PLAYER_STATS = 'poker_player_stats';
+
+const serializeGame = (game: Game): string => {
+  // Convert Map to array for JSON serialization
+  const gameData = {
+    ...game,
+    potManager: {
+      ...game.potManager,
+      playerContributions: Array.from(game.potManager.playerContributions.entries())
+    }
+  };
+  return JSON.stringify(gameData);
+};
+
+const deserializeGame = (gameString: string): Game => {
+  const gameData = JSON.parse(gameString);
+  
+  // Create new Game instance
+  const game = new Game();
+  
+  // Copy all primitive properties
+  Object.keys(gameData).forEach(key => {
+    if (key !== 'players' && key !== 'potManager') {
+      (game as any)[key] = gameData[key];
+    }
+  });
+  
+  // Recreate Player instances with proper prototype
+  if (gameData.players && Array.isArray(gameData.players)) {
+    game.players = gameData.players.map((playerData: any) => {
+      const player = new Player({
+        id: playerData.id,
+        name: playerData.name,
+        seatNumber: playerData.seatNumber,
+        stack: playerData.stack
+      });
+      
+      // Restore all player properties
+      Object.keys(playerData).forEach(key => {
+        if (key !== 'id' && key !== 'name' && key !== 'seatNumber' && key !== 'stack') {
+          (player as any)[key] = playerData[key];
+        }
+      });
+      
+      return player;
+    });
+  }
+  
+  // Recreate PotManager instance with proper prototype
+  const potManager = new PotManager();
+  if (gameData.potManager) {
+    potManager.pots = gameData.potManager.pots || [];
+    potManager.totalPot = gameData.potManager.totalPot || 0;
+    
+    // Convert playerContributions back to Map
+    if (gameData.potManager.playerContributions) {
+      if (Array.isArray(gameData.potManager.playerContributions)) {
+        potManager.playerContributions = new Map(gameData.potManager.playerContributions);
+      } else {
+        // If it was serialized as an object
+        potManager.playerContributions = new Map(Object.entries(gameData.potManager.playerContributions || {}));
+      }
+    }
+  }
+  game.potManager = potManager;
+  
+  return game;
+};
+
+const saveToHistory = (game: Game | null): string => {
+  return serializeGame(game as Game);
+};
+
+const restoreFromHistory = (historyItem: string): Game | null => {
+  if (!historyItem) return null;
+  return deserializeGame(historyItem);
+};
 
 const useGameStore = create<GameStore>()((set, get) => ({
     currentGame: null,
+    gameHistory: [],
+    historyIndex: -1,
+    savedGames: [],
+    playerStats: new Map(),
+    stacksBeforeHand: null,
 
     createNewGame: (config: GameConfig) => {
       const newGame = new Game(config);
-      set({ currentGame: newGame });
+      const state = get();
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(newGame)];
+      set({ 
+        currentGame: newGame,
+        gameHistory: newHistory.slice(-MAX_HISTORY),
+        historyIndex: newHistory.length - 1
+      });
+      
+      // Load saved games and stats from localStorage
+      get().loadSavedGamesFromStorage();
+      get().loadPlayerStatsFromStorage();
     },
 
     addPlayer: (name: string, seatNumber?: number, stack?: number) => {
@@ -30,8 +159,13 @@ const useGameStore = create<GameStore>()((set, get) => ({
       
       try {
         game.addPlayer(name, seatNumber || null, stack || null);
-        // Force re-render by creating new reference with proper prototype
-        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+        const state = get();
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        set({ 
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: newHistory.slice(-MAX_HISTORY),
+          historyIndex: newHistory.length - 1
+        });
       } catch (error) {
         console.error('Failed to add player:', error);
         throw error;
@@ -44,7 +178,13 @@ const useGameStore = create<GameStore>()((set, get) => ({
       
       try {
         game.removePlayer(playerId);
-        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+        const state = get();
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        set({ 
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: newHistory.slice(-MAX_HISTORY),
+          historyIndex: newHistory.length - 1
+        });
       } catch (error) {
         console.error('Failed to remove player:', error);
         throw error;
@@ -53,13 +193,57 @@ const useGameStore = create<GameStore>()((set, get) => ({
 
     startHand: () => {
       const game = get().currentGame;
-      if (!game) return;
+      if (!game) {
+        console.error('No current game found');
+        return;
+      }
       
       try {
+        // Track VPIP stats before hand starts
+        const state = get();
+        const activePlayers = game.getActivePlayers();
+        
+        // Validate we have enough players
+        if (activePlayers.length < 2) {
+          throw new Error('Need at least 2 players to start');
+        }
+        
+        // Store stacks before hand starts for profit calculation
+        const stacksBeforeHand = new Map<string, number>();
+        
+        activePlayers.forEach(player => {
+          // Store stack before hand
+          stacksBeforeHand.set(player.id, player.stack);
+          
+          let stats = state.playerStats.get(player.name);
+          if (!stats) {
+            stats = {
+              playerName: player.name,
+              handsPlayed: 0,
+              handsWon: 0,
+              totalProfit: 0,
+              vpip: 0,
+              startingStack: player.stack
+            };
+            state.playerStats.set(player.name, stats);
+          }
+          stats.handsPlayed++;
+        });
+        
+        // Store the stacks before hand starts
         game.startHand();
-        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+        
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        set({ 
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: newHistory.slice(-MAX_HISTORY),
+          historyIndex: newHistory.length - 1,
+          playerStats: new Map(state.playerStats),
+          stacksBeforeHand: stacksBeforeHand // Store for profit calculation
+        });
       } catch (error) {
         console.error('Failed to start hand:', error);
+        // Don't corrupt state on error
         throw error;
       }
     },
@@ -69,8 +253,63 @@ const useGameStore = create<GameStore>()((set, get) => ({
       if (!game) return;
       
       try {
+        // Track VPIP for voluntary betting actions (not blinds)
+        const state = get();
+        const player = game.players.find(p => p.id === playerId);
+        if (player && game.currentRound === 0 && 
+            !player.hasActedVoluntarily && // Track only first voluntary action
+            (action === ActionType.BET || action === ActionType.CALL || 
+             action === ActionType.RAISE || action === ActionType.ALL_IN)) {
+          let stats = state.playerStats.get(player.name);
+          if (stats && stats.handsPlayed > 0) {
+            // Mark that player has acted voluntarily this hand
+            player.hasActedVoluntarily = true;
+            const handsVoluntarilyPlayed = Math.round(stats.vpip * stats.handsPlayed / 100) + 1;
+            stats.vpip = Math.min(100, Math.round((handsVoluntarilyPlayed / stats.handsPlayed) * 100));
+          }
+        }
+        
+        // Store stacks before action for profit tracking
+        const stacksBefore = new Map(game.players.map(p => [p.id, p.stack]));
+        const statusBefore = game.status;
+        
         game.performAction(playerId, action, amount || 0);
-        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+        
+        // Check if hand ended (status changed to WAITING)
+        if (statusBefore === GameStatus.IN_PROGRESS && game.status === GameStatus.WAITING) {
+          // Hand ended due to everyone folding - find the winner
+          const remainingPlayers = game.getPlayersInHand();
+          if (remainingPlayers.length === 1) {
+            // Update winner stats
+            const winner = remainingPlayers[0];
+            let winnerStats = state.playerStats.get(winner.name);
+            if (winnerStats) {
+              winnerStats.handsWon++;
+            }
+          }
+          
+          // Update profit stats for all players using stacks from before hand started
+          const stacksBeforeHand = state.stacksBeforeHand || stacksBefore;
+          game.players.forEach(p => {
+            let stats = state.playerStats.get(p.name);
+            if (stats && stacksBeforeHand.has(p.id)) {
+              const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
+              const profit = p.stack - stackBeforeHand;
+              stats.totalProfit += profit;
+            }
+          });
+          
+          // Save stats to localStorage
+          get().savePlayerStatsToStorage();
+        }
+        
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        set({ 
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: newHistory.slice(-MAX_HISTORY),
+          historyIndex: newHistory.length - 1,
+          playerStats: new Map(state.playerStats)
+        });
       } catch (error) {
         console.error('Failed to perform action:', error);
         throw error;
@@ -82,8 +321,43 @@ const useGameStore = create<GameStore>()((set, get) => ({
       if (!game) return;
       
       try {
+        // Track stats before ending hand
+        const state = get();
+        winnerIds.forEach(winnerId => {
+          const winner = game.players.find(p => p.id === winnerId);
+          if (winner) {
+            let stats = state.playerStats.get(winner.name);
+            if (stats) {
+              stats.handsWon++;
+            }
+          }
+        });
+        
+        // Get stacks from before the hand started
+        const stacksBeforeHand = state.stacksBeforeHand || new Map(game.players.map(p => [p.id, p.stack]));
+        
         game.endHand(winnerIds);
-        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+        
+        // Update profit stats using stacks from before hand started
+        game.players.forEach(player => {
+          let stats = state.playerStats.get(player.name);
+          if (stats && stacksBeforeHand.has(player.id)) {
+            const stackBeforeHand = stacksBeforeHand.get(player.id) || 0;
+            const profit = player.stack - stackBeforeHand;
+            stats.totalProfit += profit;
+          }
+        });
+        
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        set({ 
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: newHistory.slice(-MAX_HISTORY),
+          historyIndex: newHistory.length - 1,
+          playerStats: new Map(state.playerStats)
+        });
+        
+        // Save stats to localStorage
+        get().savePlayerStatsToStorage();
       } catch (error) {
         console.error('Failed to end hand:', error);
         throw error;
@@ -95,8 +369,46 @@ const useGameStore = create<GameStore>()((set, get) => ({
       if (!game) return;
       
       try {
+        // Track stats before ending hand
+        const state = get();
+        
+        // Get unique winners (player might win multiple pots)
+        const uniqueWinnerIds = new Set(Object.values(potWinners).flat());
+        uniqueWinnerIds.forEach(winnerId => {
+          const winner = game.players.find(p => p.id === winnerId);
+          if (winner) {
+            let stats = state.playerStats.get(winner.name);
+            if (stats) {
+              stats.handsWon++;
+            }
+          }
+        });
+        
+        // Get stacks from before the hand started
+        const stacksBeforeHand = state.stacksBeforeHand || new Map(game.players.map(p => [p.id, p.stack]));
+        
         game.endHandWithPots(potWinners);
-        set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+        
+        // Update profit stats using stacks from before hand started
+        game.players.forEach(player => {
+          let stats = state.playerStats.get(player.name);
+          if (stats && stacksBeforeHand.has(player.id)) {
+            const stackBeforeHand = stacksBeforeHand.get(player.id) || 0;
+            const profit = player.stack - stackBeforeHand;
+            stats.totalProfit += profit;
+          }
+        });
+        
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        set({ 
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: newHistory.slice(-MAX_HISTORY),
+          historyIndex: newHistory.length - 1,
+          playerStats: new Map(state.playerStats)
+        });
+        
+        // Save stats to localStorage
+        get().savePlayerStatsToStorage();
       } catch (error) {
         console.error('Failed to end hand with pots:', error);
         throw error;
@@ -126,7 +438,13 @@ const useGameStore = create<GameStore>()((set, get) => ({
         player.status = PlayerStatus.ELIMINATED;
       }
       
-      set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+      const state = get();
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      set({ 
+        currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+        gameHistory: newHistory.slice(-MAX_HISTORY),
+        historyIndex: newHistory.length - 1
+      });
     },
 
     rebuyPlayer: (playerId: string, amount: number) => {
@@ -148,11 +466,170 @@ const useGameStore = create<GameStore>()((set, get) => ({
         player.status = PlayerStatus.ACTIVE;
       }
       
-      set({ currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game) });
+      const state = get();
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      set({ 
+        currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+        gameHistory: newHistory.slice(-MAX_HISTORY),
+        historyIndex: newHistory.length - 1
+      });
     },
 
     resetGame: () => {
-      set({ currentGame: null });
+      set({ 
+        currentGame: null,
+        gameHistory: [],
+        historyIndex: -1
+      });
+    },
+    
+    undo: () => {
+      const state = get();
+      if (state.historyIndex > 0) {
+        const newIndex = state.historyIndex - 1;
+        const restoredGame = restoreFromHistory(state.gameHistory[newIndex]);
+        set({
+          currentGame: restoredGame,
+          historyIndex: newIndex
+        });
+      }
+    },
+    
+    canUndo: () => {
+      const state = get();
+      return state.historyIndex > 0;
+    },
+    
+    saveGame: (name?: string) => {
+      const state = get();
+      if (!state.currentGame) return;
+      
+      const savedGames = get().getSavedGames();
+      
+      // Check if we're at max saved games
+      if (savedGames.length >= MAX_SAVED_GAMES) {
+        // Remove the oldest saved game
+        savedGames.shift();
+      }
+      
+      const savedGame: SavedGame = {
+        id: Math.random().toString(36).substr(2, 9),
+        name: name || `Saved Game ${new Date().toLocaleString()}`,
+        savedAt: Date.now(),
+        gameState: serializeGame(state.currentGame)
+      };
+      
+      const newSavedGames = [...savedGames, savedGame];
+      localStorage.setItem(STORAGE_KEY_SAVED_GAMES, JSON.stringify(newSavedGames));
+      set({ savedGames: newSavedGames });
+    },
+    
+    loadGame: (saveId: string) => {
+      const savedGames = get().getSavedGames();
+      const savedGame = savedGames.find(sg => sg.id === saveId);
+      
+      if (savedGame) {
+        try {
+          const restoredGame = deserializeGame(savedGame.gameState);
+          
+          // Validate the restored game
+          if (!restoredGame.potManager || typeof restoredGame.potManager.reset !== 'function') {
+            console.error('PotManager not properly restored');
+            throw new Error('Failed to restore game state properly');
+          }
+          
+          // Validate players
+          if (restoredGame.players && restoredGame.players.length > 0) {
+            const invalidPlayer = restoredGame.players.find(p => typeof p.resetForNewHand !== 'function');
+            if (invalidPlayer) {
+              console.error('Player not properly restored:', invalidPlayer);
+              throw new Error('Failed to restore player state properly');
+            }
+          }
+          
+          const newHistory = [saveToHistory(restoredGame)];
+          set({
+            currentGame: restoredGame,
+            gameHistory: newHistory,
+            historyIndex: 0
+          });
+        } catch (error) {
+          console.error('Failed to load game:', error);
+          alert('Failed to load saved game. The save file may be corrupted.');
+        }
+      }
+    },
+    
+    deleteSavedGame: (saveId: string) => {
+      const savedGames = get().getSavedGames();
+      const newSavedGames = savedGames.filter(sg => sg.id !== saveId);
+      localStorage.setItem(STORAGE_KEY_SAVED_GAMES, JSON.stringify(newSavedGames));
+      set({ savedGames: newSavedGames });
+    },
+    
+    getSavedGames: () => {
+      const state = get();
+      if (state.savedGames.length === 0) {
+        get().loadSavedGamesFromStorage();
+      }
+      return state.savedGames;
+    },
+    
+    loadSavedGamesFromStorage: () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_SAVED_GAMES);
+        if (saved) {
+          const savedGames = JSON.parse(saved) as SavedGame[];
+          // Validate that saved games have proper structure
+          const validSavedGames = savedGames.filter(sg => {
+            try {
+              // Try to deserialize to validate it
+              const testGame = deserializeGame(sg.gameState);
+              return testGame && testGame.players;
+            } catch (e) {
+              console.warn('Invalid saved game found, skipping:', sg.name);
+              return false;
+            }
+          });
+          set({ savedGames: validSavedGames });
+        }
+      } catch (error) {
+        console.error('Failed to load saved games:', error);
+        set({ savedGames: [] });
+      }
+    },
+    
+    loadPlayerStatsFromStorage: () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_PLAYER_STATS);
+        if (saved) {
+          const statsArray = JSON.parse(saved) as PlayerStats[];
+          const statsMap = new Map(statsArray.map(s => [s.playerName, s]));
+          set({ playerStats: statsMap });
+        }
+      } catch (error) {
+        console.error('Failed to load player stats:', error);
+      }
+    },
+    
+    savePlayerStatsToStorage: () => {
+      const state = get();
+      const statsArray = Array.from(state.playerStats.values());
+      localStorage.setItem(STORAGE_KEY_PLAYER_STATS, JSON.stringify(statsArray));
+    },
+    
+    getPlayerStats: () => {
+      const state = get();
+      if (state.playerStats.size === 0) {
+        get().loadPlayerStatsFromStorage();
+      }
+      return Array.from(state.playerStats.values());
+    },
+    
+    updatePlayerStats: () => {
+      // Stats are updated automatically in action methods
+      // This method exists for manual refresh if needed
+      get().savePlayerStatsToStorage();
     }
   }));
 

@@ -4,6 +4,7 @@ import { GameStatus, ActionType } from '../models/Game';
 import { PlayerStatus } from '../models/Player';
 import PlayerCard from './PlayerCard';
 import ActionButtons from './ActionButtons';
+import StatsModal from './StatsModal';
 import './GameScreen.css';
 
 interface GameScreenProps {
@@ -11,8 +12,23 @@ interface GameScreenProps {
 }
 
 const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
-  const { currentGame, startHand, performAction, endHand, endHandWithPots } = useGameStore();
+  const { 
+    currentGame, 
+    startHand, 
+    performAction, 
+    endHandWithPots,
+    undo,
+    canUndo,
+    saveGame,
+    loadGame,
+    deleteSavedGame,
+    getSavedGames
+  } = useGameStore();
   const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [showLoadModal, setShowLoadModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
+  const [saveName, setSaveName] = useState('');
   const [potWinners, setPotWinners] = useState<{ [potId: string]: string[] }>({});
 
   if (!currentGame) {
@@ -27,7 +43,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
   }
 
   const currentPlayer = currentGame.getCurrentPlayer();
-  const activePlayers = currentGame.getActivePlayers();
   const potTotal = currentGame.potManager.totalPot;
   const pots = currentGame.potManager.pots;
 
@@ -43,7 +58,8 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
     try {
       startHand();
     } catch (error: any) {
-      alert(error.message);
+      console.error('Error starting hand:', error);
+      alert(error.message || 'Failed to start hand');
     }
   };
 
@@ -95,16 +111,77 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
       };
     });
   };
+  
+  const handleSave = () => {
+    saveGame(saveName || undefined);
+    setSaveName('');
+    setShowSaveModal(false);
+    alert('Game saved!');
+  };
+  
+  const handleLoad = (saveId: string) => {
+    if (window.confirm('Loading will replace the current game. Continue?')) {
+      loadGame(saveId);
+      setShowLoadModal(false);
+    }
+  };
+  
+  const handleDelete = (saveId: string) => {
+    if (window.confirm('Delete this saved game?')) {
+      deleteSavedGame(saveId);
+    }
+  };
+  
+  const handleUndo = () => {
+    if (canUndo()) {
+      undo();
+    }
+  };
 
   return (
     <div className="game-screen">
       <div className="game-header">
-        <button className="back-button" onClick={onBack}>← Back</button>
-        <h1>{currentGame.name}</h1>
-        <div className="game-info">
-          <span>Hand #{currentGame.handNumber}</span>
-          <span>Round {currentGame.currentRound + 1}/{currentGame.totalRounds}</span>
-          <span>Blinds: {currentGame.smallBlind}/{currentGame.bigBlind}</span>
+        <div className="header-left">
+          <button className="back-button" onClick={onBack}>← Back</button>
+          <button 
+            className="undo-button" 
+            onClick={handleUndo}
+            disabled={!canUndo()}
+            title="Undo last action"
+          >
+            ↶ Undo
+          </button>
+        </div>
+        <div className="header-center">
+          <h1>{currentGame.name}</h1>
+          <div className="game-info">
+            <span>Hand #{currentGame.handNumber}</span>
+            <span>Round {currentGame.currentRound + 1}/{currentGame.totalRounds}</span>
+            <span>Blinds: {currentGame.smallBlind}/{currentGame.bigBlind}</span>
+          </div>
+        </div>
+        <div className="header-right">
+          <button 
+            className="save-button" 
+            onClick={() => setShowSaveModal(true)}
+            title="Save game"
+          >
+            💾 Save
+          </button>
+          <button 
+            className="load-button" 
+            onClick={() => setShowLoadModal(true)}
+            title="Load game"
+          >
+            📁 Load
+          </button>
+          <button 
+            className="stats-button" 
+            onClick={() => setShowStatsModal(true)}
+            title="View stats"
+          >
+            📊 Stats
+          </button>
         </div>
       </div>
 
@@ -172,6 +249,57 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
         </div>
       )}
 
+      {/* Save Game Modal */}
+      {showSaveModal && (
+        <div className="modal-overlay" onClick={() => setShowSaveModal(false)}>
+          <div className="modal-content save-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Save Game</h2>
+            <input
+              type="text"
+              placeholder="Enter save name (optional)"
+              value={saveName}
+              onChange={(e) => setSaveName(e.target.value)}
+              className="save-name-input"
+            />
+            <div className="modal-actions">
+              <button onClick={() => setShowSaveModal(false)}>Cancel</button>
+              <button onClick={handleSave} className="confirm-button">Save</button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Load Game Modal */}
+      {showLoadModal && (
+        <div className="modal-overlay" onClick={() => setShowLoadModal(false)}>
+          <div className="modal-content load-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Load Saved Game</h2>
+            <div className="saved-games-list">
+              {getSavedGames().length === 0 ? (
+                <p className="no-saves">No saved games found</p>
+              ) : (
+                getSavedGames().map(save => (
+                  <div key={save.id} className="saved-game-item">
+                    <div className="save-info">
+                      <div className="save-name">{save.name}</div>
+                      <div className="save-date">{new Date(save.savedAt).toLocaleString()}</div>
+                    </div>
+                    <div className="save-actions">
+                      <button onClick={() => handleLoad(save.id)} className="load-btn">Load</button>
+                      <button onClick={() => handleDelete(save.id)} className="delete-btn">🗑️</button>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="modal-actions">
+              <button onClick={() => setShowLoadModal(false)}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Winner Selection Modal */}
       {showWinnerModal && (
         <div className="modal-overlay" onClick={() => setShowWinnerModal(false)}>
           <div className="modal-content winner-modal" onClick={(e) => e.stopPropagation()}>
@@ -246,6 +374,9 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
           </div>
         </div>
       )}
+      
+      {/* Stats Modal */}
+      <StatsModal show={showStatsModal} onClose={() => setShowStatsModal(false)} />
     </div>
   );
 };

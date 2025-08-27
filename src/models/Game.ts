@@ -136,9 +136,23 @@ export class Game {
     this.handNumber++;
     this.status = GameStatus.IN_PROGRESS;
     this.currentRound = 0;
-    this.potManager.reset();
     
-    this.players.forEach(player => player.resetForNewHand());
+    // Ensure potManager has proper methods
+    if (typeof this.potManager.reset === 'function') {
+      this.potManager.reset();
+    } else {
+      console.warn('PotManager reset method not found, recreating PotManager');
+      this.potManager = new PotManager();
+    }
+    
+    this.players.forEach(player => {
+      if (typeof player.resetForNewHand === 'function') {
+        player.resetForNewHand();
+      } else {
+        console.error('Player resetForNewHand method not found for player:', player.name);
+        throw new Error('Player object is not properly initialized. Please refresh the page.');
+      }
+    });
     
     this.moveDealerButton();
     this.postBlindsAndAntes();

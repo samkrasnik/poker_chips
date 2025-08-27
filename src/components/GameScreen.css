@@ -29,20 +29,64 @@
 
 .game-header {
   margin-bottom: 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
 }
 
-.back-button {
+.header-left, .header-right {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.header-center {
+  flex: 1;
+  text-align: center;
+}
+
+.back-button, .undo-button, .save-button, .load-button, .stats-button {
   padding: 8px 16px;
   background: #333;
   color: white;
   border: none;
   border-radius: 4px;
   cursor: pointer;
-  margin-bottom: 10px;
+  transition: background 0.2s;
 }
 
-.back-button:hover {
+.back-button:hover, .undo-button:hover:not(:disabled), 
+.save-button:hover, .load-button:hover, .stats-button:hover {
   background: #444;
+}
+
+.undo-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.save-button {
+  background: #2196F3;
+}
+
+.save-button:hover {
+  background: #1976D2;
+}
+
+.load-button {
+  background: #9C27B0;
+}
+
+.load-button:hover {
+  background: #7B1FA2;
+}
+
+.stats-button {
+  background: #FF9800;
+}
+
+.stats-button:hover {
+  background: #F57C00;
 }
 
 .game-header h1 {
@@ -306,4 +350,101 @@
   text-align: center;
   margin-bottom: 25px;
   font-size: 24px;
+}
+
+/* Save/Load Modal Styles */
+.save-modal, .load-modal {
+  max-width: 500px;
+}
+
+.save-name-input {
+  width: 100%;
+  padding: 12px;
+  border: 2px solid #444;
+  background: #2a2a2a;
+  color: white;
+  border-radius: 6px;
+  font-size: 16px;
+  margin: 20px 0;
+}
+
+.save-name-input:focus {
+  outline: none;
+  border-color: #2196F3;
+}
+
+.saved-games-list {
+  max-height: 400px;
+  overflow-y: auto;
+  margin: 20px 0;
+}
+
+.no-saves {
+  text-align: center;
+  color: #888;
+  padding: 40px 20px;
+  font-style: italic;
+}
+
+.saved-game-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px;
+  margin-bottom: 10px;
+  background: #333;
+  border-radius: 8px;
+  transition: background 0.2s;
+}
+
+.saved-game-item:hover {
+  background: #3a3a3a;
+}
+
+.save-info {
+  flex: 1;
+}
+
+.save-name {
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+  margin-bottom: 5px;
+}
+
+.save-date {
+  font-size: 14px;
+  color: #888;
+}
+
+.save-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.load-btn {
+  padding: 8px 16px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.load-btn:hover {
+  background: #45a049;
+}
+
+.delete-btn {
+  padding: 8px 12px;
+  background: #f44336;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.delete-btn:hover {
+  background: #da190b;
 }

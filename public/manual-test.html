@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Manual Hand Play Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .container {
+            display: flex;
+            gap: 20px;
+        }
+        .test-controls {
+            flex: 1;
+            max-width: 400px;
+        }
+        .app-frame {
+            flex: 2;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            display: block;
+            width: 100%;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        button:disabled {
+            background-color: #ccc;
+            cursor: not-allowed;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+        }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+        }
+        .success {
+            background-color: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            color: #721c24;
+        }
+        .info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+        }
+        #log {
+            background-color: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        iframe {
+            width: 100%;
+            height: 600px;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+        }
+        .step {
+            margin: 10px 0;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <h1>Poker Chips Web - Manual Hand Play Test</h1>
+    
+    <div class="container">
+        <div class="test-controls">
+            <div class="test-section">
+                <h3>Test Steps</h3>
+                <button id="step1">Step 1: Setup Game (Bob & Charlie)</button>
+                <button id="step2">Step 2: Start Hand</button>
+                <button id="step3">Step 3: Check Game State</button>
+                <button id="step4">Step 4: First Player Action</button>
+                <button id="step5">Step 5: Second Player Action</button>
+                <button id="step6">Step 6: Continue Betting Rounds</button>
+                <button id="step7">Step 7: Select Winners</button>
+                <button id="step8">Step 8: Distribute Pots</button>
+                <button id="step9">Step 9: Verify Results</button>
+                <button id="analyzeState">Analyze Current State</button>
+            </div>
+
+            <div class="test-section">
+                <h3>Current Game State</h3>
+                <div id="gameState"></div>
+            </div>
+
+            <div class="test-section">
+                <h3>Test Log</h3>
+                <div id="log"></div>
+            </div>
+        </div>
+
+        <div class="app-frame">
+            <iframe id="gameFrame" src="http://localhost:3000"></iframe>
+        </div>
+    </div>
+
+    <script>
+        const logEl = document.getElementById('log');
+        const stateEl = document.getElementById('gameState');
+        let iframe;
+        let iframeDoc;
+
+        function log(message, type = 'info') {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `[${time}] ${message}`;
+            logEntry.className = `status ${type}`;
+            logEl.appendChild(logEntry);
+            logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        function updateGameState(state) {
+            stateEl.innerHTML = state;
+        }
+
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function getIframeElements() {
+            iframe = document.getElementById('gameFrame');
+            iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+        }
+
+        function analyzeGameState() {
+            getIframeElements();
+            
+            let state = '<div class="step">';
+            
+            // Check for players
+            const playerCards = iframeDoc.querySelectorAll('.player-card');
+            if (playerCards.length > 0) {
+                state += '<h4>Players:</h4><ul>';
+                playerCards.forEach((card, index) => {
+                    const name = card.querySelector('h3')?.textContent || `Player ${index + 1}`;
+                    const stack = card.textContent.match(/Stack: \$(\d+)/)?.[1] || 'Unknown';
+                    const status = card.textContent.includes('Folded') ? ' (Folded)' : '';
+                    state += `<li>${name}: $${stack}${status}</li>`;
+                });
+                state += '</ul>';
+            }
+
+            // Check pot amount
+            const potEl = iframeDoc.querySelector('.pot-amount');
+            if (potEl) {
+                const potAmount = potEl.textContent.match(/\$(\d+)/)?.[1] || '0';
+                state += `<h4>Pot: $${potAmount}</h4>`;
+            }
+
+            // Check current turn
+            const currentPlayerEl = iframeDoc.querySelector('.current-player');
+            if (currentPlayerEl) {
+                state += `<h4>Current Turn: ${currentPlayerEl.textContent}</h4>`;
+            }
+
+            // Check available actions
+            const actionButtons = iframeDoc.querySelectorAll('.action-buttons button');
+            if (actionButtons.length > 0) {
+                state += '<h4>Available Actions:</h4><ul>';
+                actionButtons.forEach(btn => {
+                    state += `<li>${btn.textContent}</li>`;
+                });
+                state += '</ul>';
+            }
+
+            // Check for Start Hand button
+            const startHandBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Start Hand');
+            if (startHandBtn) {
+                state += '<p><strong>Start Hand button available</strong></p>';
+            }
+
+            // Check for Select Winners button
+            const selectWinnersBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent.includes('Select Winners'));
+            if (selectWinnersBtn) {
+                state += '<p><strong>Select Winners button available</strong></p>';
+            }
+
+            state += '</div>';
+            updateGameState(state);
+        }
+
+        // Step implementations
+        async function step1Setup() {
+            log('Step 1: Setting up game with Bob and Charlie...', 'info');
+            getIframeElements();
+            
+            // Create new game
+            const createGameBtn = iframeDoc.querySelector('button');
+            if (createGameBtn && createGameBtn.textContent.includes('Create New Game')) {
+                createGameBtn.click();
+                await sleep(500);
+                log('✓ Game created', 'success');
+            }
+
+            // Add Bob
+            const nameInput = iframeDoc.querySelector('input[placeholder="Player name"]');
+            const addBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Add Player');
+            
+            if (nameInput && addBtn) {
+                nameInput.value = 'Bob';
+                nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                addBtn.click();
+                await sleep(500);
+                log('✓ Added Bob', 'success');
+
+                // Add Charlie
+                nameInput.value = 'Charlie';
+                nameInput.dispatchEvent(new Event('input', { bubbles: true }));
+                addBtn.click();
+                await sleep(500);
+                log('✓ Added Charlie', 'success');
+
+                // Start game
+                const startGameBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Start Game');
+                if (startGameBtn) {
+                    startGameBtn.click();
+                    await sleep(500);
+                    log('✓ Game started with Bob and Charlie', 'success');
+                }
+            }
+            analyzeGameState();
+        }
+
+        async function step2StartHand() {
+            log('Step 2: Starting a hand...', 'info');
+            getIframeElements();
+            
+            const startHandBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Start Hand');
+            if (startHandBtn) {
+                startHandBtn.click();
+                await sleep(500);
+                log('✓ Hand started', 'success');
+            } else {
+                log('✗ Start Hand button not found', 'error');
+            }
+            analyzeGameState();
+        }
+
+        async function step3CheckState() {
+            log('Step 3: Checking game state...', 'info');
+            getIframeElements();
+            
+            const potEl = iframeDoc.querySelector('.pot-amount');
+            const currentPlayerEl = iframeDoc.querySelector('.current-player');
+            const actionButtons = iframeDoc.querySelectorAll('.action-buttons button');
+            
+            if (potEl) {
+                const potAmount = potEl.textContent.match(/\$(\d+)/)?.[1] || '0';
+                log(`Current pot: $${potAmount}`, 'info');
+            }
+            
+            if (currentPlayerEl) {
+                log(`Current turn: ${currentPlayerEl.textContent}`, 'info');
+            }
+            
+            if (actionButtons.length > 0) {
+                const actions = Array.from(actionButtons).map(b => b.textContent).join(', ');
+                log(`Available actions: ${actions}`, 'info');
+            }
+            
+            analyzeGameState();
+        }
+
+        async function step4FirstAction() {
+            log('Step 4: First player action...', 'info');
+            getIframeElements();
+            
+            const actionButtons = iframeDoc.querySelectorAll('.action-buttons button');
+            let actionTaken = false;
+            
+            // Try Call first, then Check
+            const callBtn = Array.from(actionButtons).find(b => b.textContent === 'Call');
+            const checkBtn = Array.from(actionButtons).find(b => b.textContent === 'Check');
+            
+            if (callBtn) {
+                callBtn.click();
+                log('✓ First player called', 'success');
+                actionTaken = true;
+            } else if (checkBtn) {
+                checkBtn.click();
+                log('✓ First player checked', 'success');
+                actionTaken = true;
+            }
+            
+            if (!actionTaken) {
+                log('✗ No Call or Check button available', 'error');
+            }
+            
+            await sleep(500);
+            analyzeGameState();
+        }
+
+        async function step5SecondAction() {
+            log('Step 5: Second player action...', 'info');
+            getIframeElements();
+            
+            const checkBtn = Array.from(iframeDoc.querySelectorAll('.action-buttons button')).find(b => b.textContent === 'Check');
+            
+            if (checkBtn) {
+                checkBtn.click();
+                log('✓ Second player checked', 'success');
+            } else {
+                log('✗ Check button not available', 'error');
+            }
+            
+            await sleep(500);
+            analyzeGameState();
+        }
+
+        async function step6ContinueBetting() {
+            log('Step 6: Continuing betting rounds...', 'info');
+            getIframeElements();
+            
+            let rounds = 0;
+            while (rounds < 10) { // Safety limit
+                const actionButtons = iframeDoc.querySelectorAll('.action-buttons button');
+                if (actionButtons.length === 0) {
+                    log('No more betting actions available', 'info');
+                    break;
+                }
+                
+                const checkBtn = Array.from(actionButtons).find(b => b.textContent === 'Check');
+                if (checkBtn) {
+                    checkBtn.click();
+                    log(`✓ Player checked (round ${rounds + 1})`, 'success');
+                    await sleep(500);
+                    rounds++;
+                } else {
+                    log('No Check button available, betting round may be complete', 'info');
+                    break;
+                }
+            }
+            
+            analyzeGameState();
+        }
+
+        async function step7SelectWinners() {
+            log('Step 7: Selecting winners...', 'info');
+            getIframeElements();
+            
+            const selectWinnersBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent.includes('Select Winners'));
+            
+            if (selectWinnersBtn) {
+                selectWinnersBtn.click();
+                await sleep(500);
+                log('✓ Select Winners modal opened', 'success');
+                
+                // Look for winner options
+                const winnerOptions = iframeDoc.querySelectorAll('.winner-option');
+                if (winnerOptions.length > 0) {
+                    winnerOptions[0].click(); // Select first player
+                    await sleep(500);
+                    log('✓ Winner selected', 'success');
+                } else {
+                    log('⚠ No winner options found', 'error');
+                }
+            } else {
+                log('✗ Select Winners button not found', 'error');
+            }
+            
+            analyzeGameState();
+        }
+
+        async function step8DistributePots() {
+            log('Step 8: Distributing pots...', 'info');
+            getIframeElements();
+            
+            const distributeBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Distribute Pots');
+            
+            if (distributeBtn) {
+                distributeBtn.click();
+                await sleep(500);
+                log('✓ Pots distributed', 'success');
+            } else {
+                log('✗ Distribute Pots button not found', 'error');
+            }
+            
+            analyzeGameState();
+        }
+
+        async function step9VerifyResults() {
+            log('Step 9: Verifying results...', 'info');
+            getIframeElements();
+            
+            await sleep(1000); // Give time for updates
+            
+            // Check pot is now $0
+            const potEl = iframeDoc.querySelector('.pot-amount');
+            if (potEl) {
+                const potAmount = potEl.textContent.match(/\$(\d+)/)?.[1] || '0';
+                if (potAmount === '0') {
+                    log('✓ Pot is now $0', 'success');
+                } else {
+                    log(`⚠ Pot is still $${potAmount}`, 'error');
+                }
+            }
+            
+            // Check if Start Hand button is available for new hand
+            const startHandBtn = Array.from(iframeDoc.querySelectorAll('button')).find(b => b.textContent === 'Start Hand');
+            if (startHandBtn) {
+                log('✓ Start Hand button available for new hand', 'success');
+            } else {
+                log('⚠ Start Hand button not available', 'error');
+            }
+            
+            // Check player stacks
+            const playerCards = iframeDoc.querySelectorAll('.player-card');
+            if (playerCards.length > 0) {
+                log('Player stacks after distribution:', 'info');
+                playerCards.forEach((card, index) => {
+                    const name = card.querySelector('h3')?.textContent || `Player ${index + 1}`;
+                    const stack = card.textContent.match(/Stack: \$(\d+)/)?.[1] || 'Unknown';
+                    log(`${name}: $${stack}`, 'info');
+                });
+            }
+            
+            analyzeGameState();
+        }
+
+        // Event listeners
+        document.getElementById('step1').addEventListener('click', step1Setup);
+        document.getElementById('step2').addEventListener('click', step2StartHand);
+        document.getElementById('step3').addEventListener('click', step3CheckState);
+        document.getElementById('step4').addEventListener('click', step4FirstAction);
+        document.getElementById('step5').addEventListener('click', step5SecondAction);
+        document.getElementById('step6').addEventListener('click', step6ContinueBetting);
+        document.getElementById('step7').addEventListener('click', step7SelectWinners);
+        document.getElementById('step8').addEventListener('click', step8DistributePots);
+        document.getElementById('step9').addEventListener('click', step9VerifyResults);
+        document.getElementById('analyzeState').addEventListener('click', analyzeGameState);
+
+        // Initialize
+        setTimeout(() => {
+            log('Manual test interface loaded. Use buttons to walk through the test steps.', 'info');
+            analyzeGameState();
+        }, 2000);
+    </script>
+</body>
+</html>
