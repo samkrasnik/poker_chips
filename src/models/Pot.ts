@@ -48,7 +48,7 @@ export class PotManager {
     let previousAmount = 0;
     const processedAmounts = new Set<number>();
     
-    for (const [_, contributionAmount] of contributions) {
+    for (const [, contributionAmount] of contributions) {
       if (processedAmounts.has(contributionAmount)) continue;
       processedAmounts.add(contributionAmount);
       

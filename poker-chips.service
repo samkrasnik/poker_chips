@@ -1,0 +1,19 @@
+[Unit]
+Description=Poker Chips Tracker Web Server
+After=network.target
+
+[Service]
+Type=simple
+User=librarian-dev
+WorkingDirectory=/home/librarian-dev/poker_chips/poker_chips
+ExecStart=/usr/bin/node /home/librarian-dev/poker_chips/poker_chips/server.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=poker-chips
+Environment="NODE_ENV=production"
+Environment="PORT=3000"
+
+[Install]
+WantedBy=multi-user.target
