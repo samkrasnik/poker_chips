@@ -5,6 +5,13 @@
   position: relative;
   transition: all 0.2s;
   border: 2px solid transparent;
+  width: 100%;
+}
+
+@media (max-width: 412px) {
+  .player-card {
+    padding: 10px;
+  }
 }
 
 .player-card.current-turn {
@@ -38,6 +45,12 @@
   font-weight: bold;
 }
 
+@media (max-width: 412px) {
+  .player-name {
+    font-size: 14px;
+  }
+}
+
 .player-badges {
   display: flex;
   gap: 5px;
@@ -52,6 +65,13 @@
   font-weight: bold;
 }
 
+@media (max-width: 412px) {
+  .badge {
+    padding: 1px 6px;
+    font-size: 10px;
+  }
+}
+
 .player-info {
   display: flex;
   flex-direction: column;
@@ -62,6 +82,12 @@
   display: flex;
   justify-content: space-between;
   font-size: 14px;
+}
+
+@media (max-width: 412px) {
+  .player-info > div {
+    font-size: 12px;
+  }
 }
 
 .label {
@@ -85,6 +111,14 @@
   font-size: 12px;
   font-weight: bold;
   animation: pulse 1.5s infinite;
+}
+
+@media (max-width: 412px) {
+  .current-indicator {
+    right: -5px;
+    padding: 3px 6px;
+    font-size: 10px;
+  }
 }
 
 @keyframes pulse {

@@ -6,6 +6,13 @@
   background: #1a1a1a;
   border-top: 2px solid #333;
   padding: 20px;
+  z-index: 200;
+}
+
+@media (max-width: 412px) {
+  .action-buttons {
+    padding: 10px;
+  }
 }
 
 .info-row {
@@ -14,6 +21,15 @@
   margin-bottom: 15px;
   color: #aaa;
   font-size: 14px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+@media (max-width: 412px) {
+  .info-row {
+    font-size: 12px;
+    margin-bottom: 10px;
+  }
 }
 
 .button-row {
@@ -22,6 +38,13 @@
   gap: 10px;
   margin-bottom: 10px;
   flex-wrap: wrap;
+}
+
+@media (max-width: 412px) {
+  .button-row {
+    gap: 5px;
+    margin-bottom: 5px;
+  }
 }
 
 .action-button {
@@ -38,6 +61,14 @@
   gap: 2px;
 }
 
+@media (max-width: 412px) {
+  .action-button {
+    padding: 8px 12px;
+    font-size: 12px;
+    min-width: 60px;
+  }
+}
+
 .action-button:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
@@ -51,6 +82,12 @@
 .action-button .amount {
   font-size: 12px;
   opacity: 0.9;
+}
+
+@media (max-width: 412px) {
+  .action-button .amount {
+    font-size: 10px;
+  }
 }
 
 .action-button.check {
@@ -80,6 +117,12 @@
   margin: 0 auto;
 }
 
+@media (max-width: 412px) {
+  .action-button.all-in {
+    max-width: 100%;
+  }
+}
+
 .modal-overlay {
   position: fixed;
   top: 0;
@@ -101,6 +144,13 @@
   max-width: 400px;
 }
 
+@media (max-width: 412px) {
+  .modal-content {
+    padding: 15px;
+    width: 95%;
+  }
+}
+
 .modal-content h3 {
   margin-bottom: 20px;
   color: white;
@@ -111,6 +161,13 @@
   grid-template-columns: repeat(2, 1fr);
   gap: 10px;
   margin-bottom: 20px;
+}
+
+@media (max-width: 412px) {
+  .quick-bets {
+    gap: 8px;
+    margin-bottom: 15px;
+  }
 }
 
 .quick-bet-button {
