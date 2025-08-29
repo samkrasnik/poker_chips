@@ -48,16 +48,21 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
                     : '0.0';
                   const profitClass = playerStat.totalProfit > 0 ? 'profit' : playerStat.totalProfit < 0 ? 'loss' : '';
                   
-                  // Calculate action percentages
+                  // Calculate action percentages (handle missing actionStats for backwards compatibility)
+                  const hasActionStats = playerStat.actionStats && 
+                    (playerStat.actionStats.raiseOpportunities > 0 || 
+                     playerStat.actionStats.callOpportunities > 0 || 
+                     playerStat.actionStats.foldOpportunities > 0);
+                  
                   const raisePercent = playerStat.actionStats?.raiseOpportunities > 0
                     ? ((playerStat.actionStats.raises / playerStat.actionStats.raiseOpportunities) * 100).toFixed(1)
-                    : '0.0';
+                    : hasActionStats ? '0.0' : '-';
                   const callPercent = playerStat.actionStats?.callOpportunities > 0
                     ? ((playerStat.actionStats.calls / playerStat.actionStats.callOpportunities) * 100).toFixed(1)
-                    : '0.0';
+                    : hasActionStats ? '0.0' : '-';
                   const foldPercent = playerStat.actionStats?.foldOpportunities > 0
                     ? ((playerStat.actionStats.folds / playerStat.actionStats.foldOpportunities) * 100).toFixed(1)
-                    : '0.0';
+                    : hasActionStats ? '0.0' : '-';
                   
                   return (
                     <tr key={playerStat.playerName}>
@@ -66,9 +71,9 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
                       <td>{playerStat.handsWon}</td>
                       <td>{winRate}%</td>
                       <td>{playerStat.vpip}%</td>
-                      <td>{raisePercent}%</td>
-                      <td>{callPercent}%</td>
-                      <td>{foldPercent}%</td>
+                      <td>{raisePercent === '-' ? raisePercent : `${raisePercent}%`}</td>
+                      <td>{callPercent === '-' ? callPercent : `${callPercent}%`}</td>
+                      <td>{foldPercent === '-' ? foldPercent : `${foldPercent}%`}</td>
                       <td className={profitClass}>
                         {playerStat.totalProfit > 0 ? '+' : ''}
                         ${playerStat.totalProfit}

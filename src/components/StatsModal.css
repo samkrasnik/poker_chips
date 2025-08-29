@@ -14,10 +14,13 @@
 .stats-table {
   width: 100%;
   margin-top: 20px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .stats-table table {
   width: 100%;
+  min-width: 600px;
   border-collapse: collapse;
   margin-bottom: 20px;
 }
@@ -72,4 +75,26 @@
 .stats-legend strong {
   color: #2c3e50;
   font-weight: 600;
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+  .stats-modal {
+    max-width: 95vw;
+    max-height: 80vh;
+  }
+  
+  .stats-table th {
+    padding: 8px 6px;
+    font-size: 12px;
+  }
+  
+  .stats-table td {
+    padding: 6px;
+    font-size: 12px;
+  }
+  
+  .stats-legend {
+    font-size: 12px;
+  }
 }

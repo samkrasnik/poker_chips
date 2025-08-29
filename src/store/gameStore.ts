@@ -725,7 +725,24 @@ const useGameStore = create<GameStore>()((set, get) => ({
         const saved = localStorage.getItem(STORAGE_KEY_PLAYER_STATS);
         if (saved) {
           const statsArray = JSON.parse(saved) as PlayerStats[];
-          const statsMap = new Map(statsArray.map(s => [s.playerName, s]));
+          // Ensure backwards compatibility - add actionStats if missing
+          const fixedStats = statsArray.map(s => ({
+            ...s,
+            actionStats: s.actionStats || {
+              raises: 0,
+              calls: 0,
+              folds: 0,
+              checks: 0,
+              bets: 0,
+              allIns: 0,
+              raiseOpportunities: 0,
+              callOpportunities: 0,
+              foldOpportunities: 0,
+              checkOpportunities: 0,
+              betOpportunities: 0
+            }
+          }));
+          const statsMap = new Map(fixedStats.map(s => [s.playerName, s]));
           set({ playerStats: statsMap });
         }
       } catch (error) {

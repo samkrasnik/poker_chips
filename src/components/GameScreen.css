@@ -237,12 +237,18 @@
   gap: 15px;
   margin-bottom: 30px;
   padding-bottom: 10px;
+  padding-right: 20px; /* Add buffer after last player */
   -webkit-overflow-scrolling: touch;
 }
 
 .players-container > * {
   flex: 0 0 auto;
   min-width: 250px;
+}
+
+/* Add extra space after last player card */
+.players-container > *:last-child {
+  margin-right: 20px;
 }
 
 @media (max-width: 412px) {
