@@ -10,6 +10,21 @@ interface SavedGame {
   gameState: string;
 }
 
+interface ActionStats {
+  raises: number;
+  calls: number;
+  folds: number;
+  checks: number;
+  bets: number;
+  allIns: number;
+  // Opportunities for each action
+  raiseOpportunities: number;
+  callOpportunities: number;
+  foldOpportunities: number;
+  checkOpportunities: number;
+  betOpportunities: number;
+}
+
 interface PlayerStats {
   playerName: string;
   handsPlayed: number;
@@ -17,6 +32,7 @@ interface PlayerStats {
   totalProfit: number;
   vpip: number; // Voluntary Put money In Pot percentage
   startingStack: number;
+  actionStats: ActionStats;
 }
 
 interface GameStore {
@@ -223,7 +239,20 @@ const useGameStore = create<GameStore>()((set, get) => ({
               handsWon: 0,
               totalProfit: 0,
               vpip: 0,
-              startingStack: player.stack
+              startingStack: player.stack,
+              actionStats: {
+                raises: 0,
+                calls: 0,
+                folds: 0,
+                checks: 0,
+                bets: 0,
+                allIns: 0,
+                raiseOpportunities: 0,
+                callOpportunities: 0,
+                foldOpportunities: 0,
+                checkOpportunities: 0,
+                betOpportunities: 0
+              }
             };
             state.playerStats.set(player.name, stats);
           }
@@ -253,19 +282,111 @@ const useGameStore = create<GameStore>()((set, get) => ({
       if (!game) return;
       
       try {
-        // Track VPIP for voluntary betting actions (not blinds)
+        // Track VPIP for voluntary betting actions pre-flop
         const state = get();
         const player = game.players.find(p => p.id === playerId);
-        if (player && game.currentRound === 0 && 
-            !player.hasActedVoluntarily && // Track only first voluntary action
-            (action === ActionType.BET || action === ActionType.CALL || 
-             action === ActionType.RAISE || action === ActionType.ALL_IN)) {
+        
+        // VPIP tracks voluntary money put in pot pre-flop
+        // Count: calls, bets, raises, all-ins
+        // Don't count: big blind checking when no raise, folds
+        if (player && game.currentRound === 0 && !player.hasActedVoluntarily) {
+          let shouldCountVPIP = false;
+          
+          if (action === ActionType.FOLD) {
+            // Folding never counts for VPIP
+            shouldCountVPIP = false;
+          } else if (player.isBigBlind && action === ActionType.CHECK && game.currentBet === game.bigBlind) {
+            // Big blind checking with no raise doesn't count
+            shouldCountVPIP = false;
+          } else if (action === ActionType.BET || action === ActionType.CALL || 
+                     action === ActionType.RAISE || action === ActionType.ALL_IN) {
+            // All other voluntary actions count (including BB calling a raise)
+            shouldCountVPIP = true;
+          }
+          
+          if (shouldCountVPIP) {
+            let stats = state.playerStats.get(player.name);
+            if (stats && stats.handsPlayed > 0) {
+              // Mark that player has acted voluntarily this hand
+              player.hasActedVoluntarily = true;
+              const handsVoluntarilyPlayed = Math.round(stats.vpip * stats.handsPlayed / 100) + 1;
+              stats.vpip = Math.min(100, Math.round((handsVoluntarilyPlayed / stats.handsPlayed) * 100));
+            }
+          }
+        }
+        
+        // Track action statistics
+        if (player) {
           let stats = state.playerStats.get(player.name);
-          if (stats && stats.handsPlayed > 0) {
-            // Mark that player has acted voluntarily this hand
-            player.hasActedVoluntarily = true;
-            const handsVoluntarilyPlayed = Math.round(stats.vpip * stats.handsPlayed / 100) + 1;
-            stats.vpip = Math.min(100, Math.round((handsVoluntarilyPlayed / stats.handsPlayed) * 100));
+          if (!stats) {
+            // Initialize stats if missing
+            stats = {
+              playerName: player.name,
+              handsPlayed: 0,
+              handsWon: 0,
+              totalProfit: 0,
+              vpip: 0,
+              startingStack: player.stack,
+              actionStats: {
+                raises: 0,
+                calls: 0,
+                folds: 0,
+                checks: 0,
+                bets: 0,
+                allIns: 0,
+                raiseOpportunities: 0,
+                callOpportunities: 0,
+                foldOpportunities: 0,
+                checkOpportunities: 0,
+                betOpportunities: 0
+              }
+            };
+            state.playerStats.set(player.name, stats);
+          }
+          
+          // Track opportunities (what actions were available)
+          // Fold is always available when it's your turn
+          if (player.status === PlayerStatus.ACTIVE) {
+            stats.actionStats.foldOpportunities++;
+            
+            // Check if call is available (there's a bet to call)
+            if (game.currentBet > player.currentBet) {
+              stats.actionStats.callOpportunities++;
+              // Raise is available when there's a bet
+              if (player.stack > (game.currentBet - player.currentBet)) {
+                stats.actionStats.raiseOpportunities++;
+              }
+            } else {
+              // Check is available when there's no bet to call
+              stats.actionStats.checkOpportunities++;
+              // Bet is available when no one has bet yet
+              if (game.currentBet === 0 || 
+                  (player.isBigBlind && game.currentBet === game.bigBlind && game.currentRound === 0)) {
+                stats.actionStats.betOpportunities++;
+              }
+            }
+          }
+          
+          // Track actual actions taken
+          switch (action) {
+            case ActionType.RAISE:
+              stats.actionStats.raises++;
+              break;
+            case ActionType.CALL:
+              stats.actionStats.calls++;
+              break;
+            case ActionType.FOLD:
+              stats.actionStats.folds++;
+              break;
+            case ActionType.CHECK:
+              stats.actionStats.checks++;
+              break;
+            case ActionType.BET:
+              stats.actionStats.bets++;
+              break;
+            case ActionType.ALL_IN:
+              stats.actionStats.allIns++;
+              break;
           }
         }
         
@@ -514,7 +635,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
       
       const savedGame: SavedGame = {
         id: Math.random().toString(36).substr(2, 9),
-        name: name || `Saved Game ${new Date().toLocaleString()}`,
+        name: name || state.currentGame.name || `Saved Game ${new Date().toLocaleString()}`,
         savedAt: Date.now(),
         gameState: serializeGame(state.currentGame)
       };

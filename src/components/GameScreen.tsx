@@ -8,10 +8,9 @@ import StatsModal from './StatsModal';
 import './GameScreen.css';
 
 interface GameScreenProps {
-  onBack: () => void;
 }
 
-const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
+const GameScreen: React.FC<GameScreenProps> = () => {
   const { 
     currentGame, 
     startHand, 
@@ -36,7 +35,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
       <div className="game-screen">
         <div className="no-game">
           <h2>No Active Game</h2>
-          <button onClick={onBack}>Create New Game</button>
+          <button onClick={() => window.location.reload()}>Create New Game</button>
         </div>
       </div>
     );
@@ -142,7 +141,6 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
     <div className="game-screen">
       <div className="game-header">
         <div className="header-left">
-          <button className="back-button" onClick={onBack}>← Back</button>
           <button 
             className="undo-button" 
             onClick={handleUndo}
@@ -163,7 +161,10 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
         <div className="header-right">
           <button 
             className="save-button" 
-            onClick={() => setShowSaveModal(true)}
+            onClick={() => {
+              setSaveName(currentGame.name);
+              setShowSaveModal(true);
+            }}
             title="Save game"
           >
             💾 Save
@@ -229,6 +230,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
           minBet={currentGame.minBet}
           minRaise={currentGame.minRaise}
           potSize={potTotal}
+          bettingLimit={currentGame.bettingLimit}
           onAction={handleAction}
         />
       )}
@@ -256,7 +258,7 @@ const GameScreen: React.FC<GameScreenProps> = ({ onBack }) => {
             <h2>Save Game</h2>
             <input
               type="text"
-              placeholder="Enter save name (optional)"
+              placeholder="Enter save name"
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
               className="save-name-input"

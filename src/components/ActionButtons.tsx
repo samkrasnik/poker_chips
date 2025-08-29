@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ActionType } from '../models/Game';
+import { ActionType, BettingLimit } from '../models/Game';
 import { Player } from '../models/Player';
 import './ActionButtons.css';
 
@@ -9,6 +9,7 @@ interface ActionButtonsProps {
   minBet: number;
   minRaise: number;
   potSize: number;
+  bettingLimit: BettingLimit;
   onAction: (action: ActionType, amount?: number) => void;
 }
 
@@ -18,6 +19,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   minBet,
   minRaise,
   potSize,
+  bettingLimit,
   onAction
 }) => {
   const [showRaiseModal, setShowRaiseModal] = useState(false);
@@ -33,23 +35,45 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
 
   const handleBet = () => {
     const amount = parseInt(betAmount);
-    if (amount >= minBet && amount <= currentPlayer.stack) {
+    let maxBet = currentPlayer.stack;
+    
+    // In pot limit, max bet is pot size
+    if (bettingLimit === BettingLimit.POT_LIMIT) {
+      maxBet = Math.min(potSize, currentPlayer.stack);
+    } else if (bettingLimit === BettingLimit.FIXED_LIMIT) {
+      // In fixed limit, bet is exactly minBet
+      maxBet = minBet;
+    }
+    
+    if (amount >= minBet && amount <= maxBet) {
       onAction(ActionType.BET, amount);
       setShowBetModal(false);
       setBetAmount('');
     } else {
-      alert(`Bet must be between ${minBet} and ${currentPlayer.stack}`);
+      alert(`Bet must be between ${minBet} and ${maxBet}`);
     }
   };
 
   const handleRaise = () => {
     const amount = parseInt(raiseAmount);
-    if (amount >= currentBet + minRaise && amount <= currentPlayer.stack + currentPlayer.currentBet) {
+    let maxRaise = currentPlayer.stack + currentPlayer.currentBet;
+    
+    // Calculate max raise based on betting limit
+    if (bettingLimit === BettingLimit.POT_LIMIT) {
+      // In pot limit, max raise is pot size after calling
+      const potAfterCall = potSize + (currentBet - currentPlayer.currentBet);
+      maxRaise = Math.min(currentBet + potAfterCall, currentPlayer.stack + currentPlayer.currentBet);
+    } else if (bettingLimit === BettingLimit.FIXED_LIMIT) {
+      // In fixed limit, raise is exactly minRaise
+      maxRaise = currentBet + minRaise;
+    }
+    
+    if (amount >= currentBet + minRaise && amount <= maxRaise) {
       onAction(ActionType.RAISE, amount);
       setShowRaiseModal(false);
       setRaiseAmount('');
     } else {
-      alert(`Raise must be between ${currentBet + minRaise} and ${currentPlayer.stack + currentPlayer.currentBet}`);
+      alert(`Raise must be between ${currentBet + minRaise} and ${maxRaise}`);
     }
   };
 
@@ -116,38 +140,59 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
         </button>
       </div>
 
-      <button 
-        className="action-button all-in" 
-        onClick={() => onAction(ActionType.ALL_IN)}
-        disabled={currentPlayer.stack === 0}
-      >
-        <span>ALL IN</span>
-        <span className="amount">${currentPlayer.stack}</span>
-      </button>
+      {bettingLimit !== BettingLimit.FIXED_LIMIT && (
+        <button 
+          className="action-button all-in" 
+          onClick={() => onAction(ActionType.ALL_IN)}
+          disabled={currentPlayer.stack === 0}
+        >
+          <span>ALL IN</span>
+          <span className="amount">${currentPlayer.stack}</span>
+        </button>
+      )}
 
       {showBetModal && (
         <div className="modal-overlay" onClick={() => setShowBetModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3>Enter Bet Amount</h3>
             
-            <div className="quick-bets">
-              <QuickBetButton multiplier={0.33} label="1/3" />
-              <QuickBetButton multiplier={0.5} label="1/2" />
-              <QuickBetButton multiplier={0.75} label="3/4" />
-              <QuickBetButton multiplier={1} label="POT" />
-            </div>
+            {bettingLimit === BettingLimit.FIXED_LIMIT ? (
+              <div className="fixed-limit-info">
+                <p>Fixed Limit: Bet will be ${minBet}</p>
+              </div>
+            ) : (
+              <>
+                <div className="quick-bets">
+                  <QuickBetButton multiplier={0.33} label="1/3" />
+                  <QuickBetButton multiplier={0.5} label="1/2" />
+                  <QuickBetButton multiplier={0.75} label="3/4" />
+                  {bettingLimit === BettingLimit.POT_LIMIT ? (
+                    <QuickBetButton multiplier={1} label="POT" />
+                  ) : (
+                    <QuickBetButton multiplier={1} label="POT" />
+                  )}
+                </div>
 
-            <input
-              type="number"
-              value={betAmount}
-              onChange={e => setBetAmount(e.target.value)}
-              placeholder={`Min: ${minBet}, Max: ${currentPlayer.stack}`}
-              autoFocus
-            />
+                <input
+                  type="number"
+                  value={betAmount}
+                  onChange={e => setBetAmount(e.target.value)}
+                  placeholder={`Min: ${minBet}, Max: ${bettingLimit === BettingLimit.POT_LIMIT ? Math.min(potSize, currentPlayer.stack) : currentPlayer.stack}`}
+                  autoFocus
+                />
+              </>
+            )}
 
             <div className="modal-actions">
               <button onClick={() => setShowBetModal(false)}>Cancel</button>
-              <button onClick={handleBet} className="confirm">Bet</button>
+              <button onClick={() => {
+                if (bettingLimit === BettingLimit.FIXED_LIMIT) {
+                  onAction(ActionType.BET, minBet);
+                  setShowBetModal(false);
+                } else {
+                  handleBet();
+                }
+              }} className="confirm">Bet</button>
             </div>
           </div>
         </div>
@@ -158,24 +203,77 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           <div className="modal-content" onClick={e => e.stopPropagation()}>
             <h3>Enter Raise Amount</h3>
             
-            <div className="quick-bets">
-              <QuickBetButton multiplier={0.5} label="1/2" />
-              <QuickBetButton multiplier={0.75} label="3/4" />
-              <QuickBetButton multiplier={1} label="POT" />
-              <QuickBetButton multiplier={1.5} label="1.5x" />
-            </div>
+            {bettingLimit === BettingLimit.FIXED_LIMIT ? (
+              <div className="fixed-limit-info">
+                <p>Fixed Limit: Raise will be to ${currentBet + minRaise}</p>
+              </div>
+            ) : (
+              <>
+                <div className="quick-bets">
+                  {bettingLimit === BettingLimit.POT_LIMIT ? (
+                    <>
+                      <button 
+                        className="quick-bet-button pot-raise"
+                        onClick={() => {
+                          const potAfterCall = potSize + (currentBet - currentPlayer.currentBet);
+                          const potRaise = currentBet + potAfterCall;
+                          setRaiseAmount(potRaise.toString());
+                        }}
+                      >
+                        <span className="quick-bet-label">POT</span>
+                        <span className="quick-bet-amount">
+                          ${Math.min(currentBet + potSize + (currentBet - currentPlayer.currentBet), 
+                                     currentPlayer.stack + currentPlayer.currentBet)}
+                        </span>
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <QuickBetButton multiplier={0.5} label="1/2" />
+                      <QuickBetButton multiplier={0.75} label="3/4" />
+                      <QuickBetButton multiplier={1} label="POT" />
+                      <QuickBetButton multiplier={1.5} label="1.5x" />
+                    </>
+                  )}
+                </div>
 
-            <input
-              type="number"
-              value={raiseAmount}
-              onChange={e => setRaiseAmount(e.target.value)}
-              placeholder={`Min: ${currentBet + minRaise}, Max: ${currentPlayer.stack + currentPlayer.currentBet}`}
-              autoFocus
-            />
+                <input
+                  type="number"
+                  value={raiseAmount}
+                  onChange={e => setRaiseAmount(e.target.value)}
+                  placeholder={`Min: ${currentBet + minRaise}, Max: ${
+                    bettingLimit === BettingLimit.POT_LIMIT 
+                      ? Math.min(currentBet + potSize + (currentBet - currentPlayer.currentBet), 
+                                 currentPlayer.stack + currentPlayer.currentBet)
+                      : currentPlayer.stack + currentPlayer.currentBet
+                  }`}
+                  autoFocus
+                />
+                
+                {bettingLimit === BettingLimit.NO_LIMIT && (
+                  <button 
+                    className="all-in-in-modal"
+                    onClick={() => {
+                      onAction(ActionType.ALL_IN);
+                      setShowRaiseModal(false);
+                    }}
+                  >
+                    All In (${currentPlayer.stack})
+                  </button>
+                )}
+              </>
+            )}
 
             <div className="modal-actions">
               <button onClick={() => setShowRaiseModal(false)}>Cancel</button>
-              <button onClick={handleRaise} className="confirm">Raise</button>
+              <button onClick={() => {
+                if (bettingLimit === BettingLimit.FIXED_LIMIT) {
+                  onAction(ActionType.RAISE, currentBet + minRaise);
+                  setShowRaiseModal(false);
+                } else {
+                  handleRaise();
+                }
+              }} className="confirm">Raise</button>
             </div>
           </div>
         </div>

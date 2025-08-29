@@ -31,7 +31,10 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
                   <th>Hands Won</th>
                   <th>Win Rate</th>
                   <th>VPIP</th>
-                  <th>Total Profit/Loss</th>
+                  <th>Raise%</th>
+                  <th>Call%</th>
+                  <th>Fold%</th>
+                  <th>Total P/L</th>
                   <th>ROI</th>
                 </tr>
               </thead>
@@ -45,6 +48,17 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
                     : '0.0';
                   const profitClass = playerStat.totalProfit > 0 ? 'profit' : playerStat.totalProfit < 0 ? 'loss' : '';
                   
+                  // Calculate action percentages
+                  const raisePercent = playerStat.actionStats?.raiseOpportunities > 0
+                    ? ((playerStat.actionStats.raises / playerStat.actionStats.raiseOpportunities) * 100).toFixed(1)
+                    : '0.0';
+                  const callPercent = playerStat.actionStats?.callOpportunities > 0
+                    ? ((playerStat.actionStats.calls / playerStat.actionStats.callOpportunities) * 100).toFixed(1)
+                    : '0.0';
+                  const foldPercent = playerStat.actionStats?.foldOpportunities > 0
+                    ? ((playerStat.actionStats.folds / playerStat.actionStats.foldOpportunities) * 100).toFixed(1)
+                    : '0.0';
+                  
                   return (
                     <tr key={playerStat.playerName}>
                       <td className="player-name">{playerStat.playerName}</td>
@@ -52,6 +66,9 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
                       <td>{playerStat.handsWon}</td>
                       <td>{winRate}%</td>
                       <td>{playerStat.vpip}%</td>
+                      <td>{raisePercent}%</td>
+                      <td>{callPercent}%</td>
+                      <td>{foldPercent}%</td>
                       <td className={profitClass}>
                         {playerStat.totalProfit > 0 ? '+' : ''}
                         ${playerStat.totalProfit}
@@ -67,7 +84,8 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
             </table>
             
             <div className="stats-legend">
-              <p><strong>VPIP:</strong> Voluntary Put money In Pot - percentage of hands where player voluntarily bet/raised pre-flop</p>
+              <p><strong>VPIP:</strong> Voluntary Put money In Pot - percentage of hands where player voluntarily put money in pre-flop (bet/call/raise, not BB check)</p>
+              <p><strong>Raise%/Call%/Fold%:</strong> Percentage of times player took each action when it was available</p>
               <p><strong>ROI:</strong> Return on Investment - profit/loss as percentage of starting stack</p>
             </div>
           </div>
