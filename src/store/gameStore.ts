@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Game, GameStatus, ActionType, GameConfig } from '../models/Game';
+import { Game, GameStatus, ActionType, GameConfig, BettingLimit } from '../models/Game';
 import { Player, PlayerStatus } from '../models/Player';
 import { PotManager } from '../models/Pot';
 
@@ -85,12 +85,26 @@ const serializeGame = (game: Game): string => {
 const deserializeGame = (gameString: string): Game => {
   const gameData = JSON.parse(gameString);
   
-  // Create new Game instance
-  const game = new Game();
+  // Create new Game instance with config
+  const game = new Game({
+    name: gameData.name,
+    maxPlayers: gameData.maxPlayers,
+    startingStack: gameData.startingStack,
+    smallBlind: gameData.smallBlind,
+    bigBlind: gameData.bigBlind,
+    ante: gameData.ante,
+    bettingLimit: gameData.bettingLimit || BettingLimit.NO_LIMIT,
+    minBet: gameData.minBet,
+    minRaise: gameData.minRaise,
+    totalRounds: gameData.totalRounds
+  });
   
-  // Copy all primitive properties
+  // Copy all other properties
   Object.keys(gameData).forEach(key => {
-    if (key !== 'players' && key !== 'potManager') {
+    if (key !== 'players' && key !== 'potManager' && 
+        key !== 'name' && key !== 'maxPlayers' && key !== 'startingStack' &&
+        key !== 'smallBlind' && key !== 'bigBlind' && key !== 'ante' &&
+        key !== 'bettingLimit' && key !== 'minBet' && key !== 'minRaise' && key !== 'totalRounds') {
       (game as any)[key] = gameData[key];
     }
   });

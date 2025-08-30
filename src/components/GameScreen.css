@@ -237,8 +237,9 @@
   gap: 15px;
   margin-bottom: 30px;
   padding-bottom: 10px;
-  padding-right: 20px; /* Add buffer after last player */
+  padding-right: 50px; /* Increased buffer after last player */
   -webkit-overflow-scrolling: touch;
+  scroll-padding-right: 50px;
 }
 
 .players-container > * {
@@ -248,7 +249,15 @@
 
 /* Add extra space after last player card */
 .players-container > *:last-child {
-  margin-right: 20px;
+  margin-right: 50px; /* Increased margin */
+  position: relative;
+}
+
+/* Ensure container has enough space for scrolling */
+.players-container::after {
+  content: '';
+  flex: 0 0 50px;
+  height: 1px;
 }
 
 @media (max-width: 412px) {

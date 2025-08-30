@@ -328,6 +328,32 @@ export class Game {
       return;
     }
     
+    // Check if we should auto-complete (everyone all-in except maybe one)
+    const activePlayers = this.players.filter(p => p.status === PlayerStatus.ACTIVE);
+    const allInPlayers = this.players.filter(p => p.status === PlayerStatus.ALL_IN);
+    
+    if (activePlayers.length === 0 && allInPlayers.length > 1) {
+      // Everyone is all-in, skip to showdown
+      this.currentRound = this.totalRounds;
+      this.status = GameStatus.HAND_COMPLETE;
+      this.potManager.createSidePots(this.players);
+      return;
+    }
+    
+    if (activePlayers.length === 1 && allInPlayers.length > 0) {
+      // Only one player can act, check if they should auto-complete
+      const activePlayer = activePlayers[0];
+      const maxAllInBet = Math.max(...allInPlayers.map(p => p.currentBet), 0);
+      
+      if (activePlayer.currentBet >= maxAllInBet && activePlayer.hasActed) {
+        // Active player has covered all all-ins and acted, skip to showdown
+        this.currentRound = this.totalRounds;
+        this.status = GameStatus.HAND_COMPLETE;
+        this.potManager.createSidePots(this.players);
+        return;
+      }
+    }
+    
     // Move to next player
     this.moveToNextPlayer();
     
@@ -476,6 +502,30 @@ export class Game {
       // Create final pots when hand is complete
       this.potManager.createSidePots(this.players);
       return;
+    }
+    
+    // Check if all remaining players are all-in (no more betting possible)
+    const activePlayers = this.players.filter(p => p.status === PlayerStatus.ACTIVE);
+    const allInPlayers = this.players.filter(p => p.status === PlayerStatus.ALL_IN);
+    
+    if (activePlayers.length === 0 && allInPlayers.length > 1) {
+      // Everyone is all-in, skip to showdown
+      this.currentRound = this.totalRounds;
+      this.status = GameStatus.HAND_COMPLETE;
+      this.potManager.createSidePots(this.players);
+      return;
+    }
+    
+    if (activePlayers.length === 1 && allInPlayers.length > 0) {
+      // Only one player can act, check if they've matched the highest all-in
+      const maxAllIn = Math.max(...allInPlayers.map(p => p.currentBet));
+      if (activePlayers[0].currentBet >= maxAllIn) {
+        // Active player has covered all all-ins, skip to showdown
+        this.currentRound = this.totalRounds;
+        this.status = GameStatus.HAND_COMPLETE;
+        this.potManager.createSidePots(this.players);
+        return;
+      }
     }
     
     // Reset for new round
