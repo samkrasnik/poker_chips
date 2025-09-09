@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Player, PlayerStatus } from '../models/Player';
 import useGameStore from '../store/gameStore';
 import { GameStatus } from '../models/Game';
@@ -10,10 +10,19 @@ interface PlayerCardProps {
 }
 
 const PlayerCard: React.FC<PlayerCardProps> = ({ player, isCurrentTurn }) => {
-  const { currentGame, editPlayerStack, rebuyPlayer } = useGameStore();
+  const { currentGame, editPlayerStack, rebuyPlayer, movePlayerSeat, setDealer } = useGameStore();
   const [showEditModal, setShowEditModal] = useState(false);
   const [editAmount, setEditAmount] = useState(player.stack.toString());
   const [rebuyAmount, setRebuyAmount] = useState('1000');
+  const [editSeat, setEditSeat] = useState(player.seatNumber.toString());
+
+  useEffect(() => {
+    setEditAmount(player.stack.toString());
+  }, [player.stack]);
+
+  useEffect(() => {
+    setEditSeat(player.seatNumber.toString());
+  }, [player.seatNumber]);
   const getBadges = () => {
     const badges = [];
     if (player.isDealer) badges.push('D');
@@ -57,6 +66,19 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isCurrentTurn }) => {
     }
   };
 
+  const handleSeatChange = () => {
+    const seat = parseInt(editSeat);
+    if (!isNaN(seat) && seat >= 1) {
+      movePlayerSeat(player.id, seat);
+      setShowEditModal(false);
+    }
+  };
+
+  const handleSetDealer = () => {
+    setDealer(player.id);
+    setShowEditModal(false);
+  };
+
   const canEdit = currentGame?.status !== GameStatus.IN_PROGRESS;
 
   return (
@@ -66,7 +88,7 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isCurrentTurn }) => {
         onClick={() => canEdit && setShowEditModal(true)}
       >
         <div className="player-header">
-          <span className="player-name">{player.name}</span>
+          <span className="player-name">{player.seatNumber}. {player.name}</span>
           <div className="player-badges">
             {getBadges().map(badge => (
               <span key={badge} className="badge">{badge}</span>
@@ -111,8 +133,24 @@ const PlayerCard: React.FC<PlayerCardProps> = ({ player, isCurrentTurn }) => {
       {showEditModal && (
         <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
           <div className="modal-content" onClick={e => e.stopPropagation()}>
-            <h3>Edit {player.name}'s Stack</h3>
-            
+            <h3>Edit {player.name}</h3>
+
+            <div className="edit-section">
+              <label>Move to Seat:</label>
+              <input
+                type="number"
+                value={editSeat}
+                onChange={e => setEditSeat(e.target.value)}
+                min="1"
+                max={currentGame?.maxPlayers}
+              />
+              <button onClick={handleSeatChange} className="confirm">Move Seat</button>
+            </div>
+
+            <div className="edit-section">
+              <button onClick={handleSetDealer} className="confirm">Make Dealer</button>
+            </div>
+
             <div className="edit-section">
               <label>Set Stack To:</label>
               <input

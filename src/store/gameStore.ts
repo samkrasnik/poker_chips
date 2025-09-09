@@ -53,6 +53,8 @@ interface GameStore {
   endHandWithPots: (potWinners: { [potId: string]: string[] }) => void;
   editPlayerStack: (playerId: string, newStack: number) => void;
   rebuyPlayer: (playerId: string, amount: number) => void;
+  movePlayerSeat: (playerId: string, newSeat: number) => void;
+  setDealer: (playerId: string) => void;
   resetGame: () => void;
   undo: () => void;
   canUndo: () => boolean;
@@ -598,7 +600,54 @@ const useGameStore = create<GameStore>()((set, get) => ({
       
       const state = get();
       const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-      set({ 
+      set({
+        currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+        gameHistory: newHistory.slice(-MAX_HISTORY),
+        historyIndex: newHistory.length - 1
+      });
+    },
+
+    movePlayerSeat: (playerId: string, newSeat: number) => {
+      const game = get().currentGame;
+      if (!game) return;
+
+      // Only allow seat changes when game is not in progress
+      if (game.status === GameStatus.IN_PROGRESS) {
+        console.error('Cannot move seats during a hand');
+        return;
+      }
+
+      try {
+        game.movePlayerSeat(playerId, newSeat);
+      } catch (error) {
+        console.error('Failed to move player seat:', error);
+        return;
+      }
+
+      const state = get();
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      set({
+        currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+        gameHistory: newHistory.slice(-MAX_HISTORY),
+        historyIndex: newHistory.length - 1
+      });
+    },
+
+    setDealer: (playerId: string) => {
+      const game = get().currentGame;
+      if (!game) return;
+
+      // Only allow dealer change when game is not in progress
+      if (game.status === GameStatus.IN_PROGRESS) {
+        console.error('Cannot change dealer during a hand');
+        return;
+      }
+
+      game.setDealerButton(playerId);
+
+      const state = get();
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      set({
         currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
         gameHistory: newHistory.slice(-MAX_HISTORY),
         historyIndex: newHistory.length - 1
@@ -606,7 +655,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
     },
 
     resetGame: () => {
-      set({ 
+      set({
         currentGame: null,
         gameHistory: [],
         historyIndex: -1
