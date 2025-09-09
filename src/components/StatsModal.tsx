@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import useGameStore from '../store/gameStore';
 import './StatsModal.css';
 
@@ -8,16 +8,31 @@ interface StatsModalProps {
 }
 
 const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
-  const { getPlayerStats } = useGameStore();
-  
+  const { getHistoricalStats } = useGameStore();
+  const [range, setRange] = useState<string>('all');
+
   if (!show) return null;
-  
-  const stats = getPlayerStats();
+
+  const lastN = range === 'all' ? undefined : parseInt(range, 10);
+  const stats = getHistoricalStats(lastN);
   
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content stats-modal" onClick={(e) => e.stopPropagation()}>
         <h2>Player Statistics</h2>
+
+        <div className="stats-range">
+          <label htmlFor="stats-range-select">Show:</label>
+          <select
+            id="stats-range-select"
+            value={range}
+            onChange={(e) => setRange(e.target.value)}
+          >
+            <option value="all">All Hands</option>
+            <option value="100">Last 100 Hands</option>
+            <option value="500">Last 500 Hands</option>
+          </select>
+        </div>
         
         {stats.length === 0 ? (
           <p className="no-stats">No statistics available yet. Play some hands to see stats!</p>

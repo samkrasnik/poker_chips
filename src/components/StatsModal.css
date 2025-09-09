@@ -18,6 +18,17 @@
   -webkit-overflow-scrolling: touch;
 }
 
+.stats-range {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-range select {
+  padding: 4px 8px;
+}
+
 .stats-table table {
   width: 100%;
   min-width: 600px;
