@@ -49,6 +49,7 @@ interface HandPlayerResult {
 
 interface HandHistoryEntry {
   timestamp: number;
+  gameId?: string;
   players: HandPlayerResult[];
   winners: string[]; // player names
 }
@@ -86,6 +87,7 @@ interface GameStore {
   deleteSavedGame: (saveId: string) => void;
   getSavedGames: () => SavedGame[];
   getPlayerStats: () => PlayerStats[];
+  getGameStats: (lastN?: number) => PlayerStats[];
   getHistoricalStats: (lastN?: number) => PlayerStats[];
   updatePlayerStats: () => void;
   loadSavedGamesFromStorage: () => void;
@@ -502,6 +504,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
           const handStatsMap = state.currentHandStats || new Map<string, HandTempStats>();
           const handEntry: HandHistoryEntry = {
             timestamp: Date.now(),
+            gameId: game.id,
             winners: winnerIds.map(id => game.players.find(p => p.id === id)?.name || id),
             players: game.players.map(p => {
               const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
@@ -589,6 +592,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
         const handStatsMap = state.currentHandStats || new Map<string, HandTempStats>();
         const handEntry: HandHistoryEntry = {
           timestamp: Date.now(),
+          gameId: game.id,
           winners: winnerIds.map(id => game.players.find(p => p.id === id)?.name || id),
           players: game.players.map(p => {
             const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
@@ -677,6 +681,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
         const handStatsMap = state.currentHandStats || new Map<string, HandTempStats>();
         const handEntry: HandHistoryEntry = {
           timestamp: Date.now(),
+          gameId: game.id,
           winners: Array.from(uniqueWinnerIds).map(id => game.players.find(p => p.id === id)?.name || id),
           players: game.players.map(p => {
             const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
@@ -1000,6 +1005,75 @@ const useGameStore = create<GameStore>()((set, get) => ({
         get().loadPlayerStatsFromStorage();
       }
       return Array.from(state.playerStats.values());
+    },
+
+    getGameStats: (lastN?: number) => {
+      const state = get();
+      const currentGameId = state.currentGame?.id;
+      if (!currentGameId) {
+        return [];
+      }
+      if (state.handHistory.length === 0) {
+        get().loadHandHistoryFromStorage();
+      }
+      const gameHistory = state.handHistory.filter(h => h.gameId === currentGameId);
+      const history = lastN ? gameHistory.slice(-lastN) : gameHistory;
+      const statsMap = new Map<string, PlayerStats>();
+
+      history.forEach(hand => {
+        hand.players.forEach(p => {
+          let stats = statsMap.get(p.playerName);
+          if (!stats) {
+            stats = {
+              playerName: p.playerName,
+              handsPlayed: 0,
+              handsWon: 0,
+              totalProfit: 0,
+              vpip: 0,
+              handsVoluntarilyPlayed: 0,
+              startingStack: p.stackBefore,
+              actionStats: {
+                raises: 0,
+                calls: 0,
+                folds: 0,
+                checks: 0,
+                bets: 0,
+                allIns: 0,
+                raiseOpportunities: 0,
+                callOpportunities: 0,
+                foldOpportunities: 0,
+                checkOpportunities: 0,
+                betOpportunities: 0
+              }
+            };
+            statsMap.set(p.playerName, stats);
+          }
+
+          stats.handsPlayed++;
+          if (p.won) stats.handsWon++;
+          stats.totalProfit += p.profit;
+          if (p.vpip) stats.handsVoluntarilyPlayed++;
+
+          const a = stats.actionStats;
+          const pa = p.actionStats;
+          a.raises += pa.raises;
+          a.calls += pa.calls;
+          a.folds += pa.folds;
+          a.checks += pa.checks;
+          a.bets += pa.bets;
+          a.allIns += pa.allIns;
+          a.raiseOpportunities += pa.raiseOpportunities;
+          a.callOpportunities += pa.callOpportunities;
+          a.foldOpportunities += pa.foldOpportunities;
+          a.checkOpportunities += pa.checkOpportunities;
+          a.betOpportunities += pa.betOpportunities;
+        });
+      });
+
+      return Array.from(statsMap.values()).map(s => ({
+        ...s,
+        vpip: s.handsPlayed > 0 ? parseFloat(((s.handsVoluntarilyPlayed / s.handsPlayed) * 100).toFixed(1)) : 0
+      }));
     },
 
     getHistoricalStats: (lastN?: number) => {

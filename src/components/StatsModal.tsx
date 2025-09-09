@@ -8,18 +8,31 @@ interface StatsModalProps {
 }
 
 const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
-  const { getHistoricalStats } = useGameStore();
+  const { getHistoricalStats, getGameStats } = useGameStore();
   const [range, setRange] = useState<string>('all');
+  const [scope, setScope] = useState<string>('game');
 
   if (!show) return null;
 
   const lastN = range === 'all' ? undefined : parseInt(range, 10);
-  const stats = getHistoricalStats(lastN);
+  const stats = scope === 'all' ? getHistoricalStats(lastN) : getGameStats(lastN);
   
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-content stats-modal" onClick={(e) => e.stopPropagation()}>
         <h2>Player Statistics</h2>
+
+        <div className="stats-scope">
+          <label htmlFor="stats-scope-select">Stats For:</label>
+          <select
+            id="stats-scope-select"
+            value={scope}
+            onChange={(e) => setScope(e.target.value)}
+          >
+            <option value="game">This Game</option>
+            <option value="all">All Games</option>
+          </select>
+        </div>
 
         <div className="stats-range">
           <label htmlFor="stats-range-select">Show:</label>

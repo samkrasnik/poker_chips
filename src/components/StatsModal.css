@@ -29,6 +29,17 @@
   padding: 4px 8px;
 }
 
+.stats-scope {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.stats-scope select {
+  padding: 4px 8px;
+}
+
 .stats-table table {
   width: 100%;
   min-width: 600px;
