@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { Game, GameStatus, ActionType, GameConfig, BettingLimit } from '../models/Game';
 import { Player, PlayerStatus } from '../models/Player';
 import { PotManager } from '../models/Pot';
+import { isVPIPAction, updateVPIP } from '../utils/statsUtils';
 
 interface SavedGame {
   id: string;
@@ -31,6 +32,7 @@ interface PlayerStats {
   handsWon: number;
   totalProfit: number;
   vpip: number; // Voluntary Put money In Pot percentage
+  handsVoluntarilyPlayed: number;
   startingStack: number;
   actionStats: ActionStats;
 }
@@ -253,6 +255,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
               handsWon: 0,
               totalProfit: 0,
               vpip: 0,
+              handsVoluntarilyPlayed: 0,
               startingStack: player.stack,
               actionStats: {
                 raises: 0,
@@ -269,6 +272,9 @@ const useGameStore = create<GameStore>()((set, get) => ({
               }
             };
             state.playerStats.set(player.name, stats);
+          }
+          if (stats.handsVoluntarilyPlayed === undefined) {
+            stats.handsVoluntarilyPlayed = 0;
           }
           stats.handsPlayed++;
         });
@@ -300,31 +306,19 @@ const useGameStore = create<GameStore>()((set, get) => ({
         const state = get();
         const player = game.players.find(p => p.id === playerId);
         
-        // VPIP tracks voluntary money put in pot pre-flop
-        // Count: calls, bets, raises, all-ins
-        // Don't count: big blind checking when no raise, folds
-        if (player && game.currentRound === 0 && !player.hasActedVoluntarily) {
-          let shouldCountVPIP = false;
-          
-          if (action === ActionType.FOLD) {
-            // Folding never counts for VPIP
-            shouldCountVPIP = false;
-          } else if (player.isBigBlind && action === ActionType.CHECK && game.currentBet === game.bigBlind) {
-            // Big blind checking with no raise doesn't count
-            shouldCountVPIP = false;
-          } else if (action === ActionType.BET || action === ActionType.CALL || 
-                     action === ActionType.RAISE || action === ActionType.ALL_IN) {
-            // All other voluntary actions count (including BB calling a raise)
-            shouldCountVPIP = true;
-          }
-          
-          if (shouldCountVPIP) {
-            let stats = state.playerStats.get(player.name);
+        if (player && !player.hasActedVoluntarily) {
+          const didVPIP = isVPIPAction(
+            player,
+            action,
+            game.currentBet,
+            game.bigBlind,
+            game.currentRound
+          );
+          if (didVPIP) {
+            const stats = state.playerStats.get(player.name);
             if (stats && stats.handsPlayed > 0) {
-              // Mark that player has acted voluntarily this hand
               player.hasActedVoluntarily = true;
-              const handsVoluntarilyPlayed = Math.round(stats.vpip * stats.handsPlayed / 100) + 1;
-              stats.vpip = Math.min(100, Math.round((handsVoluntarilyPlayed / stats.handsPlayed) * 100));
+              updateVPIP(stats, true);
             }
           }
         }
@@ -340,6 +334,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
               handsWon: 0,
               totalProfit: 0,
               vpip: 0,
+              handsVoluntarilyPlayed: 0,
               startingStack: player.stack,
               actionStats: {
                 raises: 0,
