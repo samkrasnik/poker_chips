@@ -102,7 +102,7 @@
 .current-indicator {
   position: absolute;
   top: 50%;
-  right: -10px;
+  right: -40px;
   transform: translateY(-50%);
   background: #4CAF50;
   color: white;
@@ -115,7 +115,7 @@
 
 @media (max-width: 412px) {
   .current-indicator {
-    right: -5px;
+    right: -30px;
     padding: 3px 6px;
     font-size: 10px;
   }

@@ -70,6 +70,17 @@
   text-align: center;
 }
 
+.header-center h1 {
+  font-size: 24px;
+  margin: 0;
+}
+
+@media (max-width: 412px) {
+  .header-center h1 {
+    font-size: 18px;
+  }
+}
+
 .back-button, .undo-button, .save-button, .load-button, .stats-button {
   padding: 8px 16px;
   background: #333;
@@ -235,7 +246,7 @@
   display: flex;
   overflow-x: auto;
   gap: 15px;
-  margin-bottom: 30px;
+  margin-bottom: 200px; /* prevent bottom action bar from covering last player */
   padding-bottom: 10px;
   padding-right: 50px; /* Increased buffer after last player */
   -webkit-overflow-scrolling: touch;
@@ -263,7 +274,7 @@
 @media (max-width: 412px) {
   .players-container {
     gap: 10px;
-    margin-bottom: 80px;
+    margin-bottom: 220px; /* extra space for fixed action bar on small screens */
     display: grid;
     grid-template-columns: 1fr 1fr;
     overflow-x: visible;
