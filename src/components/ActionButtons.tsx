@@ -32,9 +32,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   const canBet = currentBet === 0 && currentPlayer.stack >= Math.min(minBet, currentPlayer.stack);
   const canRaise = currentBet > 0 && currentPlayer.stack > (currentBet - currentPlayer.currentBet);
   const callAmount = Math.min(currentBet - currentPlayer.currentBet, currentPlayer.stack);
-  
-  // Adjust minBet if player doesn't have enough chips (they would go all-in instead)
-  const effectiveMinBet = Math.min(minBet, currentPlayer.stack);
 
   const handleBet = () => {
     const amount = parseInt(betAmount);
