@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import useGameStore from '../store/gameStore';
 import { GameStatus, ActionType } from '../models/Game';
 import { PlayerStatus } from '../models/Player';
@@ -29,6 +29,20 @@ const GameScreen: React.FC<GameScreenProps> = () => {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [potWinners, setPotWinners] = useState<{ [potId: string]: string[] }>({});
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (currentGame && currentGame.status !== GameStatus.FINISHED) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [currentGame]);
 
   if (!currentGame) {
     return (
