@@ -1,0 +1,96 @@
+name: Apply Patch From Chat
+
+on:
+  workflow_dispatch:
+    inputs:
+      patch_b64:
+        description: Base64-encoded unified diff (optional if patch_url provided)
+        required: false
+      patch_url:
+        description: URL to a raw .diff/.patch file (optional if patch_b64 provided)
+        required: false
+      branch:
+        description: Branch name to create
+        required: false
+        default: chat-patch
+      commit_message:
+        description: Commit message
+        required: false
+        default: Apply patch from chat
+      pr_title:
+        description: Pull Request title
+        required: false
+        default: Patch from ChatGPT
+      pr_body:
+        description: Pull Request body
+        required: false
+        default: Automated patch from chat
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: apply-patch-from-chat
+  cancel-in-progress: false
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Obtain patch
+        id: patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ github.event.inputs.patch_url }}" ]]; then
+            curl -fsSL "${{ github.event.inputs.patch_url }}" -o /tmp/patch.diff
+          elif [[ -n "${{ github.event.inputs.patch_b64 }}" ]]; then
+            printf "%s" "${{ github.event.inputs.patch_b64 }}" | base64 -d > /tmp/patch.diff
+          else
+            echo "No patch_url or patch_b64 provided" >&2
+            exit 1
+          fi
+          echo "size=$(wc -c </tmp/patch.diff)" >> $GITHUB_OUTPUT
+          echo "::group::Patch preview (first 200 lines)"
+          head -n 200 /tmp/patch.diff || true
+          echo "::endgroup::"
+
+      - name: Create branch
+        run: |
+          git checkout -b "${{ github.event.inputs.branch }}"
+
+      - name: Apply patch
+        run: |
+          set -e
+          if git apply --whitespace=fix --reject /tmp/patch.diff; then
+            echo "Applied with git apply"
+          else
+            echo "git apply failed; trying git am"
+            git am /tmp/patch.diff
+          fi
+
+      - name: Commit changes (if using git apply)
+        run: |
+          if ! git diff --cached --quiet; then
+            git commit -m "${{ github.event.inputs.commit_message }}"
+          fi
+
+      - name: Open Pull Request
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: ${{ github.event.inputs.branch }}
+          title: ${{ github.event.inputs.pr_title }}
+          body: ${{ github.event.inputs.pr_body }}
+          base: ${{ github.ref_name }}
+          labels: patch-from-chat
