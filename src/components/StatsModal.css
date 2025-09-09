@@ -37,15 +37,16 @@
 .stats-table td {
   padding: 10px 12px;
   border-bottom: 1px solid #ecf0f1;
+  color: white;
 }
 
-.stats-table tbody tr:hover {
-  background-color: #f8f9fa;
+.stats-table tbody tr {
+  pointer-events: none;
 }
 
 .stats-table .player-name {
   font-weight: 500;
-  color: #2c3e50;
+  color: white;
 }
 
 .stats-table .profit {
