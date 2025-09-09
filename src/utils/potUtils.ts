@@ -12,6 +12,8 @@ export function calculateSidePots(
   const entries = Array.from(contributions.entries()).filter(([, amount]) => amount > 0);
   const hasAllIn = players.some(p => p.status === PlayerStatus.ALL_IN);
 
+  const statusMap = new Map(players.map(p => [p.id, p.status]));
+
   if (!hasAllIn) {
     const total = entries.reduce((sum, [, amount]) => sum + amount, 0);
     return [
@@ -30,9 +32,14 @@ export function calculateSidePots(
   let previous = 0;
 
   for (const level of levels) {
-    const eligible = sorted.filter(([, amt]) => amt >= level).map(([id]) => id);
-    const potAmount = (level - previous) * eligible.length;
-    if (potAmount > 0 && eligible.length > 0) {
+    const contributors = sorted.filter(([, amt]) => amt >= level).map(([id]) => id);
+    const potAmount = (level - previous) * contributors.length;
+    const eligible = contributors.filter(id => {
+      const status = statusMap.get(id);
+      return status === PlayerStatus.ACTIVE || status === PlayerStatus.ALL_IN;
+    });
+
+    if (potAmount > 0) {
       const prev = pots[pots.length - 1];
       const sameAsPrevious =
         prev &&
@@ -51,6 +58,18 @@ export function calculateSidePots(
       }
     }
     previous = level;
+  }
+
+  // Consolidate any side pots that have the same eligible players as the main pot
+  if (pots.length > 1) {
+    const mainEligible = pots[0].eligiblePlayers.slice().sort().join(',');
+    for (let i = pots.length - 1; i > 0; i--) {
+      const potEligible = pots[i].eligiblePlayers.slice().sort().join(',');
+      if (potEligible === mainEligible) {
+        pots[0].amount += pots[i].amount;
+        pots.splice(i, 1);
+      }
+    }
   }
 
   return pots;

@@ -62,4 +62,25 @@ describe('calculateSidePots', () => {
     expect(pots[0].eligiblePlayers).toEqual(expect.arrayContaining(['a', 'b']));
     expect(pots[0].isMain).toBe(true);
   });
+
+  test('folded players do not create extra side pots', () => {
+    const contributions = new Map([
+      ['a', 100],
+      ['b', 100],
+      ['c', 50],
+    ]);
+    const players = [
+      { id: 'a', status: PlayerStatus.ALL_IN },
+      { id: 'b', status: PlayerStatus.ALL_IN },
+      { id: 'c', status: PlayerStatus.FOLDED },
+    ];
+
+    const pots = calculateSidePots(contributions, players);
+    expect(pots).toHaveLength(1);
+    const mainPot = pots[0];
+    expect(mainPot.amount).toBe(250);
+    expect(mainPot.eligiblePlayers).toEqual(expect.arrayContaining(['a', 'b']));
+    expect(mainPot.eligiblePlayers).not.toContain('c');
+    expect(mainPot.isMain).toBe(true);
+  });
 });
