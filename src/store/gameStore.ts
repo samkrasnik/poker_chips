@@ -37,6 +37,27 @@ interface PlayerStats {
   actionStats: ActionStats;
 }
 
+interface HandPlayerResult {
+  playerId: string;
+  playerName: string;
+  stackBefore: number;
+  profit: number;
+  won: boolean;
+  vpip: boolean;
+  actionStats: ActionStats;
+}
+
+interface HandHistoryEntry {
+  timestamp: number;
+  players: HandPlayerResult[];
+  winners: string[]; // player names
+}
+
+interface HandTempStats {
+  vpip: boolean;
+  actionStats: ActionStats;
+}
+
 interface GameStore {
   currentGame: Game | null;
   gameHistory: string[];
@@ -44,6 +65,8 @@ interface GameStore {
   savedGames: SavedGame[];
   playerStats: Map<string, PlayerStats>;
   stacksBeforeHand: Map<string, number> | null;
+  handHistory: HandHistoryEntry[];
+  currentHandStats: Map<string, HandTempStats> | null;
   createNewGame: (config: GameConfig) => void;
   addPlayer: (name: string, seatNumber?: number, stack?: number) => void;
   removePlayer: (playerId: string) => void;
@@ -61,16 +84,21 @@ interface GameStore {
   deleteSavedGame: (saveId: string) => void;
   getSavedGames: () => SavedGame[];
   getPlayerStats: () => PlayerStats[];
+  getHistoricalStats: (lastN?: number) => PlayerStats[];
   updatePlayerStats: () => void;
   loadSavedGamesFromStorage: () => void;
   loadPlayerStatsFromStorage: () => void;
   savePlayerStatsToStorage: () => void;
+  loadHandHistoryFromStorage: () => void;
+  saveHandHistoryToStorage: () => void;
 }
 
 const MAX_HISTORY = 50;
 const MAX_SAVED_GAMES = 3;
 const STORAGE_KEY_SAVED_GAMES = 'poker_saved_games';
 const STORAGE_KEY_PLAYER_STATS = 'poker_player_stats';
+const MAX_HAND_HISTORY = 1000;
+const STORAGE_KEY_HAND_HISTORY = 'poker_hand_history';
 
 const serializeGame = (game: Game): string => {
   // Convert Map to array for JSON serialization
@@ -169,6 +197,8 @@ const useGameStore = create<GameStore>()((set, get) => ({
     savedGames: [],
     playerStats: new Map(),
     stacksBeforeHand: null,
+    handHistory: [],
+    currentHandStats: null,
 
     createNewGame: (config: GameConfig) => {
       const newGame = new Game(config);
@@ -183,6 +213,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
       // Load saved games and stats from localStorage
       get().loadSavedGamesFromStorage();
       get().loadPlayerStatsFromStorage();
+      get().loadHandHistoryFromStorage();
     },
 
     addPlayer: (name: string, seatNumber?: number, stack?: number) => {
@@ -278,17 +309,38 @@ const useGameStore = create<GameStore>()((set, get) => ({
           }
           stats.handsPlayed++;
         });
-        
+
+        const handStats = new Map<string, HandTempStats>();
+        activePlayers.forEach(player => {
+          handStats.set(player.id, {
+            vpip: false,
+            actionStats: {
+              raises: 0,
+              calls: 0,
+              folds: 0,
+              checks: 0,
+              bets: 0,
+              allIns: 0,
+              raiseOpportunities: 0,
+              callOpportunities: 0,
+              foldOpportunities: 0,
+              checkOpportunities: 0,
+              betOpportunities: 0
+            }
+          });
+        });
+
         // Store the stacks before hand starts
         game.startHand();
-        
+
         const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({ 
+        set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
           historyIndex: newHistory.length - 1,
           playerStats: new Map(state.playerStats),
-          stacksBeforeHand: stacksBeforeHand // Store for profit calculation
+          stacksBeforeHand: stacksBeforeHand, // Store for profit calculation
+          currentHandStats: handStats
         });
       } catch (error) {
         console.error('Failed to start hand:', error);
@@ -305,6 +357,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
         // Track VPIP for voluntary betting actions pre-flop
         const state = get();
         const player = game.players.find(p => p.id === playerId);
+        const handStats = state.currentHandStats?.get(playerId);
         
         if (player && !player.hasActedVoluntarily) {
           const didVPIP = isVPIPAction(
@@ -319,6 +372,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
             if (stats && stats.handsPlayed > 0) {
               player.hasActedVoluntarily = true;
               updateVPIP(stats, true);
+              if (handStats) handStats.vpip = true;
             }
           }
         }
@@ -357,21 +411,26 @@ const useGameStore = create<GameStore>()((set, get) => ({
           // Fold is always available when it's your turn
           if (player.status === PlayerStatus.ACTIVE) {
             stats.actionStats.foldOpportunities++;
-            
+            if (handStats) handStats.actionStats.foldOpportunities++;
+
             // Check if call is available (there's a bet to call)
             if (game.currentBet > player.currentBet) {
               stats.actionStats.callOpportunities++;
+              if (handStats) handStats.actionStats.callOpportunities++;
               // Raise is available when there's a bet
               if (player.stack > (game.currentBet - player.currentBet)) {
                 stats.actionStats.raiseOpportunities++;
+                if (handStats) handStats.actionStats.raiseOpportunities++;
               }
             } else {
               // Check is available when there's no bet to call
               stats.actionStats.checkOpportunities++;
+              if (handStats) handStats.actionStats.checkOpportunities++;
               // Bet is available when no one has bet yet
-              if (game.currentBet === 0 || 
+              if (game.currentBet === 0 ||
                   (player.isBigBlind && game.currentBet === game.bigBlind && game.currentRound === 0)) {
                 stats.actionStats.betOpportunities++;
+                if (handStats) handStats.actionStats.betOpportunities++;
               }
             }
           }
@@ -380,21 +439,27 @@ const useGameStore = create<GameStore>()((set, get) => ({
           switch (action) {
             case ActionType.RAISE:
               stats.actionStats.raises++;
+              if (handStats) handStats.actionStats.raises++;
               break;
             case ActionType.CALL:
               stats.actionStats.calls++;
+              if (handStats) handStats.actionStats.calls++;
               break;
             case ActionType.FOLD:
               stats.actionStats.folds++;
+              if (handStats) handStats.actionStats.folds++;
               break;
             case ActionType.CHECK:
               stats.actionStats.checks++;
+              if (handStats) handStats.actionStats.checks++;
               break;
             case ActionType.BET:
               stats.actionStats.bets++;
+              if (handStats) handStats.actionStats.bets++;
               break;
             case ActionType.ALL_IN:
               stats.actionStats.allIns++;
+              if (handStats) handStats.actionStats.allIns++;
               break;
           }
         }
@@ -405,19 +470,21 @@ const useGameStore = create<GameStore>()((set, get) => ({
         
         game.performAction(playerId, action, amount || 0);
         
-        // Check if hand ended (status changed to WAITING)
-        if (statusBefore === GameStatus.IN_PROGRESS && game.status === GameStatus.WAITING) {
+        const handEnded = statusBefore === GameStatus.IN_PROGRESS && game.status === GameStatus.WAITING;
+        let updatedHandHistory = state.handHistory;
+        let newCurrentHandStats = state.currentHandStats;
+        if (handEnded) {
           // Hand ended due to everyone folding - find the winner
           const remainingPlayers = game.getPlayersInHand();
-          if (remainingPlayers.length === 1) {
-            // Update winner stats
+          const winnerIds = remainingPlayers.map(p => p.id);
+          if (winnerIds.length === 1) {
             const winner = remainingPlayers[0];
             let winnerStats = state.playerStats.get(winner.name);
             if (winnerStats) {
               winnerStats.handsWon++;
             }
           }
-          
+
           // Update profit stats for all players using stacks from before hand started
           const stacksBeforeHand = state.stacksBeforeHand || stacksBefore;
           game.players.forEach(p => {
@@ -428,17 +495,55 @@ const useGameStore = create<GameStore>()((set, get) => ({
               stats.totalProfit += profit;
             }
           });
-          
+
+          const handStatsMap = state.currentHandStats || new Map<string, HandTempStats>();
+          const handEntry: HandHistoryEntry = {
+            timestamp: Date.now(),
+            winners: winnerIds.map(id => game.players.find(p => p.id === id)?.name || id),
+            players: game.players.map(p => {
+              const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
+              const profit = p.stack - stackBeforeHand;
+              const hs = handStatsMap.get(p.id);
+              return {
+                playerId: p.id,
+                playerName: p.name,
+                stackBefore: stackBeforeHand,
+                profit,
+                won: winnerIds.includes(p.id),
+                vpip: hs?.vpip || false,
+                actionStats: hs?.actionStats || {
+                  raises: 0,
+                  calls: 0,
+                  folds: 0,
+                  checks: 0,
+                  bets: 0,
+                  allIns: 0,
+                  raiseOpportunities: 0,
+                  callOpportunities: 0,
+                  foldOpportunities: 0,
+                  checkOpportunities: 0,
+                  betOpportunities: 0
+                }
+              } as HandPlayerResult;
+            })
+          };
+
+          updatedHandHistory = [...state.handHistory, handEntry].slice(-MAX_HAND_HISTORY);
+          newCurrentHandStats = null;
+
           // Save stats to localStorage
           get().savePlayerStatsToStorage();
+          get().saveHandHistoryToStorage();
         }
-        
+
         const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({ 
+        set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
           historyIndex: newHistory.length - 1,
-          playerStats: new Map(state.playerStats)
+          playerStats: new Map(state.playerStats),
+          handHistory: updatedHandHistory,
+          currentHandStats: newCurrentHandStats
         });
       } catch (error) {
         console.error('Failed to perform action:', error);
@@ -467,7 +572,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
         const stacksBeforeHand = state.stacksBeforeHand || new Map(game.players.map(p => [p.id, p.stack]));
         
         game.endHand(winnerIds);
-        
+
         // Update profit stats using stacks from before hand started
         game.players.forEach(player => {
           let stats = state.playerStats.get(player.name);
@@ -477,17 +582,54 @@ const useGameStore = create<GameStore>()((set, get) => ({
             stats.totalProfit += profit;
           }
         });
-        
+
+        const handStatsMap = state.currentHandStats || new Map<string, HandTempStats>();
+        const handEntry: HandHistoryEntry = {
+          timestamp: Date.now(),
+          winners: winnerIds.map(id => game.players.find(p => p.id === id)?.name || id),
+          players: game.players.map(p => {
+            const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
+            const profit = p.stack - stackBeforeHand;
+            const hs = handStatsMap.get(p.id);
+            return {
+              playerId: p.id,
+              playerName: p.name,
+              stackBefore: stackBeforeHand,
+              profit,
+              won: winnerIds.includes(p.id),
+              vpip: hs?.vpip || false,
+              actionStats: hs?.actionStats || {
+                raises: 0,
+                calls: 0,
+                folds: 0,
+                checks: 0,
+                bets: 0,
+                allIns: 0,
+                raiseOpportunities: 0,
+                callOpportunities: 0,
+                foldOpportunities: 0,
+                checkOpportunities: 0,
+                betOpportunities: 0
+              }
+            } as HandPlayerResult;
+          })
+        };
+
+        const updatedHandHistory = [...state.handHistory, handEntry].slice(-MAX_HAND_HISTORY);
+
         const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({ 
+        set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
           historyIndex: newHistory.length - 1,
-          playerStats: new Map(state.playerStats)
+          playerStats: new Map(state.playerStats),
+          handHistory: updatedHandHistory,
+          currentHandStats: null
         });
-        
+
         // Save stats to localStorage
         get().savePlayerStatsToStorage();
+        get().saveHandHistoryToStorage();
       } catch (error) {
         console.error('Failed to end hand:', error);
         throw error;
@@ -518,7 +660,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
         const stacksBeforeHand = state.stacksBeforeHand || new Map(game.players.map(p => [p.id, p.stack]));
         
         game.endHandWithPots(potWinners);
-        
+
         // Update profit stats using stacks from before hand started
         game.players.forEach(player => {
           let stats = state.playerStats.get(player.name);
@@ -528,17 +670,54 @@ const useGameStore = create<GameStore>()((set, get) => ({
             stats.totalProfit += profit;
           }
         });
-        
+
+        const handStatsMap = state.currentHandStats || new Map<string, HandTempStats>();
+        const handEntry: HandHistoryEntry = {
+          timestamp: Date.now(),
+          winners: Array.from(uniqueWinnerIds).map(id => game.players.find(p => p.id === id)?.name || id),
+          players: game.players.map(p => {
+            const stackBeforeHand = stacksBeforeHand.get(p.id) || 0;
+            const profit = p.stack - stackBeforeHand;
+            const hs = handStatsMap.get(p.id);
+            return {
+              playerId: p.id,
+              playerName: p.name,
+              stackBefore: stackBeforeHand,
+              profit,
+              won: uniqueWinnerIds.has(p.id),
+              vpip: hs?.vpip || false,
+              actionStats: hs?.actionStats || {
+                raises: 0,
+                calls: 0,
+                folds: 0,
+                checks: 0,
+                bets: 0,
+                allIns: 0,
+                raiseOpportunities: 0,
+                callOpportunities: 0,
+                foldOpportunities: 0,
+                checkOpportunities: 0,
+                betOpportunities: 0
+              }
+            } as HandPlayerResult;
+          })
+        };
+
+        const updatedHandHistory = [...state.handHistory, handEntry].slice(-MAX_HAND_HISTORY);
+
         const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({ 
+        set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
           historyIndex: newHistory.length - 1,
-          playerStats: new Map(state.playerStats)
+          playerStats: new Map(state.playerStats),
+          handHistory: updatedHandHistory,
+          currentHandStats: null
         });
-        
+
         // Save stats to localStorage
         get().savePlayerStatsToStorage();
+        get().saveHandHistoryToStorage();
       } catch (error) {
         console.error('Failed to end hand with pots:', error);
         throw error;
@@ -764,7 +943,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
       const statsArray = Array.from(state.playerStats.values());
       localStorage.setItem(STORAGE_KEY_PLAYER_STATS, JSON.stringify(statsArray));
     },
-    
+
     getPlayerStats: () => {
       const state = get();
       if (state.playerStats.size === 0) {
@@ -772,7 +951,88 @@ const useGameStore = create<GameStore>()((set, get) => ({
       }
       return Array.from(state.playerStats.values());
     },
-    
+
+    getHistoricalStats: (lastN?: number) => {
+      const state = get();
+      if (state.handHistory.length === 0) {
+        get().loadHandHistoryFromStorage();
+      }
+      const history = lastN ? state.handHistory.slice(-lastN) : state.handHistory;
+      const statsMap = new Map<string, PlayerStats>();
+
+      history.forEach(hand => {
+        hand.players.forEach(p => {
+          let stats = statsMap.get(p.playerName);
+          if (!stats) {
+            stats = {
+              playerName: p.playerName,
+              handsPlayed: 0,
+              handsWon: 0,
+              totalProfit: 0,
+              vpip: 0,
+              handsVoluntarilyPlayed: 0,
+              startingStack: p.stackBefore,
+              actionStats: {
+                raises: 0,
+                calls: 0,
+                folds: 0,
+                checks: 0,
+                bets: 0,
+                allIns: 0,
+                raiseOpportunities: 0,
+                callOpportunities: 0,
+                foldOpportunities: 0,
+                checkOpportunities: 0,
+                betOpportunities: 0
+              }
+            };
+            statsMap.set(p.playerName, stats);
+          }
+
+          stats.handsPlayed++;
+          if (p.won) stats.handsWon++;
+          stats.totalProfit += p.profit;
+          if (p.vpip) stats.handsVoluntarilyPlayed++;
+
+          const a = stats.actionStats;
+          const pa = p.actionStats;
+          a.raises += pa.raises;
+          a.calls += pa.calls;
+          a.folds += pa.folds;
+          a.checks += pa.checks;
+          a.bets += pa.bets;
+          a.allIns += pa.allIns;
+          a.raiseOpportunities += pa.raiseOpportunities;
+          a.callOpportunities += pa.callOpportunities;
+          a.foldOpportunities += pa.foldOpportunities;
+          a.checkOpportunities += pa.checkOpportunities;
+          a.betOpportunities += pa.betOpportunities;
+        });
+      });
+
+      return Array.from(statsMap.values()).map(s => ({
+        ...s,
+        vpip: s.handsPlayed > 0 ? parseFloat(((s.handsVoluntarilyPlayed / s.handsPlayed) * 100).toFixed(1)) : 0
+      }));
+    },
+
+    loadHandHistoryFromStorage: () => {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY_HAND_HISTORY);
+        if (saved) {
+          const history = JSON.parse(saved) as HandHistoryEntry[];
+          set({ handHistory: history });
+        }
+      } catch (error) {
+        console.error('Failed to load hand history:', error);
+      }
+    },
+
+    saveHandHistoryToStorage: () => {
+      const state = get();
+      localStorage.setItem(STORAGE_KEY_HAND_HISTORY, JSON.stringify(state.handHistory));
+    },
+
     updatePlayerStats: () => {
       // Stats are updated automatically in action methods
       // This method exists for manual refresh if needed
