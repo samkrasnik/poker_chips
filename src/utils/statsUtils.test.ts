@@ -26,6 +26,12 @@ describe('isVPIPAction', () => {
     const result = isVPIPAction(player, ActionType.BET, 10, 10, 1);
     expect(result).toBe(false);
   });
+
+  test('folding pre-flop does not count', () => {
+    const player = createPlayer();
+    const result = isVPIPAction(player, ActionType.FOLD, 10, 10, 0);
+    expect(result).toBe(false);
+  });
 });
 
 describe('updateVPIP', () => {
@@ -34,5 +40,13 @@ describe('updateVPIP', () => {
     updateVPIP(stats, true);
     expect(stats.handsVoluntarilyPlayed).toBe(2);
     expect(stats.vpip).toBe(100);
+  });
+
+  test('recalculates vpip when player does not VPIP', () => {
+    const stats: VPIPStats = { handsPlayed: 1, handsVoluntarilyPlayed: 1, vpip: 100 };
+    stats.handsPlayed++;
+    updateVPIP(stats, false);
+    expect(stats.handsVoluntarilyPlayed).toBe(1);
+    expect(stats.vpip).toBe(50);
   });
 });

@@ -27,6 +27,10 @@ export function isVPIPAction(
 export function updateVPIP(stats: VPIPStats, didVPIP: boolean): void {
   if (didVPIP) {
     stats.handsVoluntarilyPlayed += 1;
+  }
+  if (stats.handsPlayed > 0) {
     stats.vpip = Math.round((stats.handsVoluntarilyPlayed / stats.handsPlayed) * 100);
+  } else {
+    stats.vpip = 0;
   }
 }

@@ -279,6 +279,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
             stats.handsVoluntarilyPlayed = 0;
           }
           stats.handsPlayed++;
+          updateVPIP(stats, false);
         });
         
         // Store the stacks before hand starts
