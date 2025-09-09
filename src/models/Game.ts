@@ -128,6 +128,36 @@ export class Game {
     this.players.sort((a, b) => a.seatNumber - b.seatNumber);
   }
 
+  movePlayerSeat(playerId: string, newSeat: number): void {
+    const player = this.players.find(p => p.id === playerId);
+    if (!player) {
+      throw new Error('Player not found');
+    }
+    if (newSeat < 1 || newSeat > this.maxPlayers) {
+      throw new Error('Invalid seat number');
+    }
+
+    const occupyingPlayer = this.players.find(p => p.seatNumber === newSeat);
+    if (occupyingPlayer) {
+      occupyingPlayer.seatNumber = player.seatNumber;
+    }
+
+    player.seatNumber = newSeat;
+    this.sortPlayersBySeat();
+    this.dealerPosition = this.players.findIndex(p => p.isDealer);
+  }
+
+  setDealerButton(playerId: string): void {
+    const index = this.players.findIndex(p => p.id === playerId);
+    if (index === -1) {
+      throw new Error('Player not found');
+    }
+
+    this.players.forEach(p => (p.isDealer = false));
+    this.players[index].isDealer = true;
+    this.dealerPosition = index;
+  }
+
   startHand(): void {
     if (this.getActivePlayers().length < 2) {
       throw new Error('Need at least 2 players to start');
