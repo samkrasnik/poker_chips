@@ -8,7 +8,9 @@ beforeEach(() => {
     historyIndex: -1,
     savedGames: [],
     playerStats: new Map(),
-    stacksBeforeHand: null
+    stacksBeforeHand: null,
+    handHistory: [],
+    currentHandStats: null
   });
   localStorage.clear();
 });
