@@ -33,12 +33,22 @@ export function calculateSidePots(
     const eligible = sorted.filter(([, amt]) => amt >= level).map(([id]) => id);
     const potAmount = (level - previous) * eligible.length;
     if (potAmount > 0 && eligible.length > 0) {
-      pots.push({
-        id: Math.random().toString(36).substr(2, 9),
-        amount: potAmount,
-        eligiblePlayers: eligible,
-        isMain: pots.length === 0,
-      });
+      const prev = pots[pots.length - 1];
+      const sameAsPrevious =
+        prev &&
+        prev.eligiblePlayers.length === eligible.length &&
+        eligible.every(id => prev.eligiblePlayers.includes(id));
+
+      if (sameAsPrevious) {
+        prev.amount += potAmount;
+      } else {
+        pots.push({
+          id: Math.random().toString(36).substr(2, 9),
+          amount: potAmount,
+          eligiblePlayers: eligible,
+          isMain: pots.length === 0,
+        });
+      }
     }
     previous = level;
   }
