@@ -45,4 +45,21 @@ describe('calculateSidePots', () => {
     expect(sidePot.eligiblePlayers).toEqual(expect.arrayContaining(['b', 'c']));
     expect(sidePot.eligiblePlayers).not.toContain('a');
   });
+
+  test('does not create redundant side pot when all-in is fully called', () => {
+    const contributions = new Map([
+      ['a', 50],
+      ['b', 50],
+    ]);
+    const players = [
+      { id: 'a', status: PlayerStatus.ALL_IN },
+      { id: 'b', status: PlayerStatus.ACTIVE },
+    ];
+
+    const pots = calculateSidePots(contributions, players);
+    expect(pots).toHaveLength(1);
+    expect(pots[0].amount).toBe(100);
+    expect(pots[0].eligiblePlayers).toEqual(expect.arrayContaining(['a', 'b']));
+    expect(pots[0].isMain).toBe(true);
+  });
 });
