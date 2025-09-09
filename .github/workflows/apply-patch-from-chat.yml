@@ -3,12 +3,21 @@ name: Apply Patch From Chat
 on:
   workflow_dispatch:
     inputs:
+      # Option A: unified diff/patch
       patch_b64:
-        description: Base64-encoded unified diff (use this OR patch_url)
+        description: Base64-encoded unified diff (use this OR patch_url/archive inputs)
         required: false
       patch_url:
-        description: URL to a raw .diff/.patch file (use this OR patch_b64)
+        description: URL to a raw .diff/.patch file
         required: false
+      # Option B: tar.gz archive (recommended)
+      archive_b64:
+        description: Base64-encoded .tar.gz that extracts at repo root
+        required: false
+      archive_url:
+        description: URL to a .tar.gz file
+        required: false
+
       branch:
         description: Branch name to create/update
         required: false
@@ -16,7 +25,7 @@ on:
       commit_message:
         description: Commit message
         required: false
-        default: Apply patch from chat
+        default: Apply changes from chat
       pr_title:
         description: Pull Request title
         required: false
@@ -24,7 +33,7 @@ on:
       pr_body:
         description: Pull Request body
         required: false
-        default: Automated patch from chat
+        default: Automated patch/archive from chat
 
 permissions:
   contents: write
@@ -49,33 +58,53 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Obtain patch (URL or Base64; tolerant decode)
+      - name: Obtain payload (patch or archive; tolerant decode)
         id: obtain
         shell: bash
         env:
-          PATCH_URL: ${{ github.event.inputs.patch_url }}
-          PATCH_B64: ${{ github.event.inputs.patch_b64 }}
+          PATCH_URL:   ${{ github.event.inputs.patch_url }}
+          PATCH_B64:   ${{ github.event.inputs.patch_b64 }}
+          ARCHIVE_URL: ${{ github.event.inputs.archive_url }}
+          ARCHIVE_B64: ${{ github.event.inputs.archive_b64 }}
         run: |
           set -euo pipefail
-          if [[ -n "${PATCH_URL}" ]]; then
-            echo "Downloading patch from: ${PATCH_URL}"
-            curl -fsSL "${PATCH_URL}" -o /tmp/patch.diff
+          MODE=""
+          if [[ -n "${ARCHIVE_URL}" ]]; then
+            MODE="archive"
+            echo "Downloading archive: ${ARCHIVE_URL}"
+            curl -fsSL "${ARCHIVE_URL}" -o /tmp/chat_payload.tgz
+          elif [[ -n "${ARCHIVE_B64}" ]]; then
+            MODE="archive"
+            echo "Decoding archive (base64)…"
+            printf "%s" "${ARCHIVE_B64}" \
+              | tr -d '\r\n' \
+              | sed 's/[^A-Za-z0-9+\/=]//g' \
+              | base64 -di > /tmp/chat_payload.tgz
+          elif [[ -n "${PATCH_URL}" ]]; then
+            MODE="patch"
+            echo "Downloading patch: ${PATCH_URL}"
+            curl -fsSL "${PATCH_URL}" -o /tmp/chat_payload.diff
           elif [[ -n "${PATCH_B64}" ]]; then
-            echo "Decoding base64 patch (tolerant)…"
-            # Strip anything that's not valid base64 and remove newlines before decoding
+            MODE="patch"
+            echo "Decoding patch (base64)…"
             printf "%s" "${PATCH_B64}" \
               | tr -d '\r\n' \
               | sed 's/[^A-Za-z0-9+\/=]//g' \
-              | base64 -d > /tmp/patch.diff
+              | base64 -di > /tmp/chat_payload.diff
           else
-            echo "ERROR: Provide either patch_url or patch_b64" >&2
+            echo "ERROR: Provide one of archive_b64/archive_url OR patch_b64/patch_url" >&2
             exit 1
           fi
-
-          echo "Patch size: $(wc -c </tmp/patch.diff) bytes"
-          echo "::group::Patch preview (first 200 lines)"
-          head -n 200 /tmp/patch.diff || true
-          echo "::endgroup::"
+          echo "mode=${MODE}" >> "$GITHUB_OUTPUT"
+          if [[ "${MODE}" == "archive" ]]; then
+            echo "Archive size: $(wc -c </tmp/chat_payload.tgz) bytes"
+            tar -tzf /tmp/chat_payload.tgz | head -n 50 || true
+          else
+            echo "Patch size: $(wc -c </tmp/chat_payload.diff) bytes"
+            echo "::group::Patch preview (first 200 lines)"
+            head -n 200 /tmp/chat_payload.diff || true
+            echo "::endgroup::"
+          fi
 
       - name: Create/checkout branch
         shell: bash
@@ -85,15 +114,33 @@ jobs:
           set -euo pipefail
           git checkout -B "${BRANCH}"
 
+      - name: Apply archive
+        if: steps.obtain.outputs.mode == 'archive'
+        shell: bash
+        env:
+          COMMIT_MESSAGE: ${{ github.event.inputs.commit_message }}
+        run: |
+          set -euo pipefail
+          mkdir -p .
+          tar -xzf /tmp/chat_payload.tgz -C .
+          git add -A
+          if ! git diff --cached --quiet; then
+            git commit -m "${COMMIT_MESSAGE}"
+          else
+            echo "Archive extracted but no changes to commit."
+          fi
+
       - name: Apply patch
+        if: steps.obtain.outputs.mode == 'patch'
         shell: bash
         run: |
           set -euo pipefail
-          if git apply --whitespace=fix --reject /tmp/patch.diff; then
+          if git apply --whitespace=fix --reject /tmp/chat_payload.diff; then
             echo "Applied with git apply"
+            git add -A || true
           else
             echo "git apply failed; attempting 'git am' (mbox format)…"
-            git am /tmp/patch.diff
+            git am /tmp/chat_payload.diff
           fi
 
       - name: Show rejects (if any)
@@ -103,19 +150,6 @@ jobs:
           echo "::group::Rejects (*.rej)"
           find . -type f -name "*.rej" -print -exec sed -n '1,160p' {} \; || true
           echo "::endgroup::"
-
-      - name: Commit changes (for git apply path)
-        shell: bash
-        env:
-          COMMIT_MESSAGE: ${{ github.event.inputs.commit_message }}
-        run: |
-          set -euo pipefail
-          git add -A || true
-          if ! git diff --cached --quiet; then
-            git commit -m "${COMMIT_MESSAGE}"
-          else
-            echo "Nothing to commit (either 'git am' already committed or no changes)."
-          fi
 
       - name: Push branch
         shell: bash
@@ -128,30 +162,25 @@ jobs:
       - name: Open Pull Request
         uses: actions/github-script@v7
         env:
-          BRANCH: ${{ github.event.inputs.branch }}
-          PR_TITLE: ${{ github.event.inputs.pr_title }}
-          PR_BODY: ${{ github.event.inputs.pr_body }}
-          BASE: ${{ github.ref_name }}
+          BRANCH:    ${{ github.event.inputs.branch }}
+          PR_TITLE:  ${{ github.event.inputs.pr_title }}
+          PR_BODY:   ${{ github.event.inputs.pr_body }}
+          BASE:      ${{ github.ref_name }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
             const { owner, repo } = context.repo;
-            const head = process.env.BRANCH || 'chat-patch';
-            const base = process.env.BASE || 'main';
+            const head  = process.env.BRANCH || 'chat-patch';
+            const base  = process.env.BASE   || 'main';
             const title = process.env.PR_TITLE || 'Patch from ChatGPT';
-            const body = process.env.PR_BODY || 'Automated patch from chat';
-
+            const body  = process.env.PR_BODY  || 'Automated changes from chat';
             try {
               const { data } = await github.rest.pulls.create({ owner, repo, title, head, base, body });
               core.info(`PR created: ${data.html_url}`);
             } catch (e) {
               if (e.status === 422) {
                 const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}` });
-                if (prs.length) {
-                  core.info(`Existing PR: ${prs[0].html_url}`);
-                } else {
-                  throw e;
-                }
+                if (prs.length) core.info(`Existing PR: ${prs[0].html_url}`); else throw e;
               } else {
                 throw e;
               }
