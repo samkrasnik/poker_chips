@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
     inputs:
       patch_b64:
-        description: Base64-encoded unified diff (optional if patch_url provided)
+        description: Base64-encoded unified diff (use this OR patch_url)
         required: false
       patch_url:
-        description: URL to a raw .diff/.patch file (optional if patch_b64 provided)
+        description: URL to a raw .diff/.patch file (use this OR patch_b64)
         required: false
       branch:
-        description: Branch name to create
+        description: Branch name to create/update
         required: false
         default: chat-patch
       commit_message:
@@ -38,16 +38,17 @@ jobs:
   apply:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
       - name: Configure git
         run: |
-          git config user.name "github-actions[bot]"
+          git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Obtain patch
+      - name: Obtain patch (url or base64; base64 tolerant)
         id: patch
         env:
           PATCH_B64: ${{ github.event.inputs.patch_b64 }}
@@ -55,46 +56,107 @@ jobs:
         run: |
           set -euo pipefail
           if [[ -n "${PATCH_URL}" ]]; then
+            echo "Downloading patch from URL..."
             curl -fsSL "${PATCH_URL}" -o /tmp/patch.diff
           elif [[ -n "${PATCH_B64}" ]]; then
+            echo "Decoding base64 patch (tolerant mode)..."
             python3 - <<'PY' > /tmp/patch.diff
-      import os, re, base64, sys
-      s = os.environ.get("PATCH_B64","")
-      # strip anything that's not valid base64 (kills accidental backticks, spaces, etc.)
-      s = re.sub(r'[^A-Za-z0-9+/=\n\r]', '', s)
-      sys.stdout.buffer.write(base64.b64decode(s))
-      PY
+import os, re, base64, sys
+s = os.environ.get("PATCH_B64","")
+# Strip anything not valid base64 to avoid 'invalid input'
+s = re.sub(r'[^A-Za-z0-9+/=\n\r]', '', s)
+if not s.strip():
+    sys.exit("Empty or invalid base64 input")
+sys.stdout.buffer.write(base64.b64decode(s))
+PY
           else
-            echo "No patch_url or patch_b64 provided" >&2
+            echo "ERROR: No patch_url or patch_b64 provided" >&2
             exit 1
           fi
-      
+
+          echo "size=$(wc -c </tmp/patch.diff) bytes" >> $GITHUB_OUTPUT
+          echo "::group::Patch preview (first 200 lines)"
+          head -n 200 /tmp/patch.diff || true
+          echo "::endgroup::"
+
       - name: Create branch
+        env:
+          BRANCH: ${{ github.event.inputs.branch }}
         run: |
-          git checkout -b "${{ github.event.inputs.branch }}"
+          set -euo pipefail
+          git checkout -B "${BRANCH}"
 
       - name: Apply patch
         run: |
-          set -e
+          set -euo pipefail
+          # Try a regular apply first (handles unified diffs)
           if git apply --whitespace=fix --reject /tmp/patch.diff; then
             echo "Applied with git apply"
           else
-            echo "git apply failed; trying git am"
+            echo "git apply failed; attempting 'git am' (mbox format) ..."
             git am /tmp/patch.diff
           fi
 
-      - name: Commit changes (if using git apply)
+      - name: Show rejects if any
+        if: ${{ failure() }}
         run: |
+          echo "::group::Rejects (*.rej)"
+          find . -type f -name "*.rej" -print -exec sed -n '1,160p' {} \; || true
+          echo "::endgroup::"
+
+      - name: Commit changes (for git apply path)
+        env:
+          COMMIT_MESSAGE: ${{ github.event.inputs.commit_message }}
+        run: |
+          set -euo pipefail
+          # Stage everything (git am already creates commits)
+          git add -A || true
           if ! git diff --cached --quiet; then
-            git commit -m "${{ github.event.inputs.commit_message }}"
+            git commit -m "${COMMIT_MESSAGE}"
+          else
+            echo "No staged changes to commit (either 'git am' committed already or patch had no changes)."
           fi
 
+      - name: Push branch
+        env:
+          BRANCH: ${{ github.event.inputs.branch }}
+        run: |
+          set -euo pipefail
+          git push --set-upstream origin "${BRANCH}"
+
       - name: Open Pull Request
-        uses: peter-evans/create-pull-request@v6
+        uses: actions/github-script@v7
+        env:
+          BRANCH: ${{ github.event.inputs.branch }}
+          PR_TITLE: ${{ github.event.inputs.pr_title }}
+          PR_BODY: ${{ github.event.inputs.pr_body }}
+          BASE: ${{ github.ref_name }}
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: ${{ github.event.inputs.branch }}
-          title: ${{ github.event.inputs.pr_title }}
-          body: ${{ github.event.inputs.pr_body }}
-          base: ${{ github.ref_name }}
-          labels: patch-from-chat
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { owner, repo } = context.repo;
+            const head = process.env.BRANCH || 'chat-patch';
+            const base = process.env.BASE || 'main';
+            const title = process.env.PR_TITLE || 'Patch from ChatGPT';
+            const body = process.env.PR_BODY || 'Automated patch from chat';
+
+            try {
+              const { data } = await github.rest.pulls.create({
+                owner, repo, title, head, base, body
+              });
+              core.info(`PR created: ${data.html_url}`);
+            } catch (e) {
+              if (e.status === 422) {
+                // PR likely already exists; surface it
+                const { data: prs } = await github.rest.pulls.list({
+                  owner, repo, state: 'open', head: `${owner}:${head}`
+                });
+                if (prs.length) {
+                  core.info(`Existing PR: ${prs[0].html_url}`);
+                } else {
+                  throw e;
+                }
+              } else {
+                throw e;
+              }
+            }
