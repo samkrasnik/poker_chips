@@ -44,42 +44,41 @@ jobs:
           fetch-depth: 0
 
       - name: Configure git
+        shell: bash
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-      - name: Obtain patch (url or base64; base64 tolerant)
-        id: patch
+      - name: Obtain patch (URL or Base64; tolerant decode)
+        id: obtain
+        shell: bash
         env:
-          PATCH_B64: ${{ github.event.inputs.patch_b64 }}
           PATCH_URL: ${{ github.event.inputs.patch_url }}
+          PATCH_B64: ${{ github.event.inputs.patch_b64 }}
         run: |
           set -euo pipefail
           if [[ -n "${PATCH_URL}" ]]; then
-            echo "Downloading patch from URL..."
+            echo "Downloading patch from: ${PATCH_URL}"
             curl -fsSL "${PATCH_URL}" -o /tmp/patch.diff
           elif [[ -n "${PATCH_B64}" ]]; then
-            echo "Decoding base64 patch (tolerant mode)..."
-            python3 - <<'PY' > /tmp/patch.diff
-import os, re, base64, sys
-s = os.environ.get("PATCH_B64","")
-# Strip anything not valid base64 to avoid 'invalid input'
-s = re.sub(r'[^A-Za-z0-9+/=\n\r]', '', s)
-if not s.strip():
-    sys.exit("Empty or invalid base64 input")
-sys.stdout.buffer.write(base64.b64decode(s))
-PY
+            echo "Decoding base64 patch (tolerant)…"
+            # Strip anything that's not valid base64 and remove newlines before decoding
+            printf "%s" "${PATCH_B64}" \
+              | tr -d '\r\n' \
+              | sed 's/[^A-Za-z0-9+\/=]//g' \
+              | base64 -d > /tmp/patch.diff
           else
-            echo "ERROR: No patch_url or patch_b64 provided" >&2
+            echo "ERROR: Provide either patch_url or patch_b64" >&2
             exit 1
           fi
 
-          echo "size=$(wc -c </tmp/patch.diff) bytes" >> $GITHUB_OUTPUT
+          echo "Patch size: $(wc -c </tmp/patch.diff) bytes"
           echo "::group::Patch preview (first 200 lines)"
           head -n 200 /tmp/patch.diff || true
           echo "::endgroup::"
 
-      - name: Create branch
+      - name: Create/checkout branch
+        shell: bash
         env:
           BRANCH: ${{ github.event.inputs.branch }}
         run: |
@@ -87,37 +86,39 @@ PY
           git checkout -B "${BRANCH}"
 
       - name: Apply patch
+        shell: bash
         run: |
           set -euo pipefail
-          # Try a regular apply first (handles unified diffs)
           if git apply --whitespace=fix --reject /tmp/patch.diff; then
             echo "Applied with git apply"
           else
-            echo "git apply failed; attempting 'git am' (mbox format) ..."
+            echo "git apply failed; attempting 'git am' (mbox format)…"
             git am /tmp/patch.diff
           fi
 
-      - name: Show rejects if any
+      - name: Show rejects (if any)
         if: ${{ failure() }}
+        shell: bash
         run: |
           echo "::group::Rejects (*.rej)"
           find . -type f -name "*.rej" -print -exec sed -n '1,160p' {} \; || true
           echo "::endgroup::"
 
       - name: Commit changes (for git apply path)
+        shell: bash
         env:
           COMMIT_MESSAGE: ${{ github.event.inputs.commit_message }}
         run: |
           set -euo pipefail
-          # Stage everything (git am already creates commits)
           git add -A || true
           if ! git diff --cached --quiet; then
             git commit -m "${COMMIT_MESSAGE}"
           else
-            echo "No staged changes to commit (either 'git am' committed already or patch had no changes)."
+            echo "Nothing to commit (either 'git am' already committed or no changes)."
           fi
 
       - name: Push branch
+        shell: bash
         env:
           BRANCH: ${{ github.event.inputs.branch }}
         run: |
@@ -141,16 +142,11 @@ PY
             const body = process.env.PR_BODY || 'Automated patch from chat';
 
             try {
-              const { data } = await github.rest.pulls.create({
-                owner, repo, title, head, base, body
-              });
+              const { data } = await github.rest.pulls.create({ owner, repo, title, head, base, body });
               core.info(`PR created: ${data.html_url}`);
             } catch (e) {
               if (e.status === 422) {
-                // PR likely already exists; surface it
-                const { data: prs } = await github.rest.pulls.list({
-                  owner, repo, state: 'open', head: `${owner}:${head}`
-                });
+                const { data: prs } = await github.rest.pulls.list({ owner, repo, state: 'open', head: `${owner}:${head}` });
                 if (prs.length) {
                   core.info(`Existing PR: ${prs[0].html_url}`);
                 } else {
