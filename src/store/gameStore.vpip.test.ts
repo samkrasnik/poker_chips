@@ -48,3 +48,50 @@ describe('VPIP tracking across hands', () => {
     expect(bobStats.vpip).toBe(50);
   });
 });
+
+describe('VPIP stat migration', () => {
+  test('derives handsVoluntarilyPlayed from saved vpip and handsPlayed', () => {
+    const store = useGameStore.getState();
+    store.createNewGame({ startingStack: 100, smallBlind: 5, bigBlind: 10, bettingLimit: BettingLimit.NO_LIMIT });
+    store.addPlayer('Alice');
+    store.addPlayer('Bob');
+
+    const priorStats: any = {
+      playerName: 'Bob',
+      handsPlayed: 100,
+      handsWon: 0,
+      totalProfit: 0,
+      vpip: 50,
+      startingStack: 100,
+      actionStats: {
+        raises: 0,
+        calls: 0,
+        folds: 0,
+        checks: 0,
+        bets: 0,
+        allIns: 0,
+        raiseOpportunities: 0,
+        callOpportunities: 0,
+        foldOpportunities: 0,
+        checkOpportunities: 0,
+        betOpportunities: 0
+      }
+    };
+    useGameStore.setState({ playerStats: new Map([[ 'Bob', priorStats ]]) });
+
+    store.startHand();
+    let bobStats = useGameStore.getState().playerStats.get('Bob')!;
+    expect(bobStats.handsVoluntarilyPlayed).toBe(50);
+    expect(bobStats.vpip).toBe(50);
+
+    const game = useGameStore.getState().currentGame!;
+    const bob = game.players.find(p => p.name === 'Bob')!;
+    const alice = game.players.find(p => p.name === 'Alice')!;
+    store.performAction(bob.id, ActionType.CALL);
+    store.performAction(alice.id, ActionType.FOLD);
+
+    bobStats = useGameStore.getState().playerStats.get('Bob')!;
+    expect(bobStats.handsVoluntarilyPlayed).toBe(51);
+    expect(bobStats.vpip).toBe(50);
+  });
+});

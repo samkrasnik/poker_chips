@@ -367,7 +367,7 @@ const useGameStore = create<GameStore>()((set, get) => ({
             state.playerStats.set(player.name, stats);
           }
           if (stats.handsVoluntarilyPlayed === undefined) {
-            stats.handsVoluntarilyPlayed = 0;
+            stats.handsVoluntarilyPlayed = Math.round((stats.vpip / 100) * stats.handsPlayed);
           }
           stats.handsPlayed++;
           updateVPIP(stats, false);
