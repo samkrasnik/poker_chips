@@ -168,7 +168,11 @@ const GameScreen: React.FC<GameScreenProps> = () => {
           <h1>{currentGame.name}</h1>
           <div className="game-info">
             <span>Hand #{currentGame.handNumber}</span>
-            <span>Round {currentGame.currentRound + 1}/{currentGame.totalRounds}</span>
+            {currentGame.status === GameStatus.IN_PROGRESS && (
+              <span>
+                Round {currentGame.currentRound + 1}/{currentGame.totalRounds}
+              </span>
+            )}
             <span>Blinds: {currentGame.smallBlind}/{currentGame.bigBlind}</span>
           </div>
         </div>

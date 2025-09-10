@@ -124,6 +124,10 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
             <span>FOLD</span>
             <span className="amount">&nbsp;</span>
           </button>
+        ) : (
+          <button className="action-button fold" onClick={() => onAction(ActionType.FOLD)}>
+            FOLD
+          </button>
         )}
 
         {canCall && (
