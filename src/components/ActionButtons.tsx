@@ -116,7 +116,13 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       <div className="button-row">
         {canCheck ? (
           <button className="action-button check" onClick={() => onAction(ActionType.CHECK)}>
-            CHECK
+            <span>CHECK</span>
+            <span className="amount">&nbsp;</span>
+          </button>
+        ) : (
+          <button className="action-button fold" onClick={() => onAction(ActionType.FOLD)}>
+            <span>FOLD</span>
+            <span className="amount">&nbsp;</span>
           </button>
         ) : (
           <button className="action-button fold" onClick={() => onAction(ActionType.FOLD)}>
