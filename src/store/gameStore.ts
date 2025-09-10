@@ -867,22 +867,39 @@ const useGameStore = create<GameStore>()((set, get) => ({
     saveGame: (name?: string) => {
       const state = get();
       if (!state.currentGame) return;
-      
+
       const savedGames = get().getSavedGames();
-      
-      // Check if we're at max saved games
+      const nameToUse = name || state.currentGame.name || `Saved Game ${new Date().toLocaleString()}`;
+
+      // If a save with this name exists, overwrite it
+      const existingIndex = savedGames.findIndex(sg => sg.name === nameToUse);
+      if (existingIndex >= 0) {
+        const updatedGames = [...savedGames];
+        const existing = updatedGames[existingIndex];
+        updatedGames[existingIndex] = {
+          ...existing,
+          name: nameToUse,
+          savedAt: Date.now(),
+          gameState: serializeGame(state.currentGame)
+        };
+        localStorage.setItem(STORAGE_KEY_SAVED_GAMES, JSON.stringify(updatedGames));
+        set({ savedGames: updatedGames });
+        return;
+      }
+
+      // Otherwise add a new saved game, respecting the max limit
       if (savedGames.length >= MAX_SAVED_GAMES) {
         // Remove the oldest saved game
         savedGames.shift();
       }
-      
+
       const savedGame: SavedGame = {
         id: Math.random().toString(36).substr(2, 9),
-        name: name || state.currentGame.name || `Saved Game ${new Date().toLocaleString()}`,
+        name: nameToUse,
         savedAt: Date.now(),
         gameState: serializeGame(state.currentGame)
       };
-      
+
       const newSavedGames = [...savedGames, savedGame];
       localStorage.setItem(STORAGE_KEY_SAVED_GAMES, JSON.stringify(newSavedGames));
       set({ savedGames: newSavedGames });
