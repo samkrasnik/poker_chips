@@ -183,8 +183,10 @@ export class Game {
         throw new Error('Player object is not properly initialized. Please refresh the page.');
       }
     });
-    
-    this.moveDealerButton();
+
+    if (this.handNumber === 1) {
+      this.moveDealerButton();
+    }
     this.postBlindsAndAntes();
     this.determineFirstActor();
   }
@@ -608,6 +610,8 @@ export class Game {
       player.isSmallBlind = false;
       player.isBigBlind = false;
     });
+
+    this.moveDealerButton();
   }
 
   endHandWithPots(potWinners: { [potId: string]: string[] }): void {
@@ -652,6 +656,8 @@ export class Game {
       player.isSmallBlind = false;
       player.isBigBlind = false;
     });
+
+    this.moveDealerButton();
   }
 
   recordAction(player: Player, action: ActionType, amount: number): void {
