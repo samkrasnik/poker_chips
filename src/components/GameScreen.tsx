@@ -8,20 +8,22 @@ import StatsModal from './StatsModal';
 import './GameScreen.css';
 
 interface GameScreenProps {
+  onNewGame: () => void;
 }
 
-const GameScreen: React.FC<GameScreenProps> = () => {
-  const { 
-    currentGame, 
-    startHand, 
-    performAction, 
+const GameScreen: React.FC<GameScreenProps> = ({ onNewGame }) => {
+  const {
+    currentGame,
+    startHand,
+    performAction,
     endHandWithPots,
     undo,
     canUndo,
     saveGame,
     loadGame,
     deleteSavedGame,
-    getSavedGames
+    getSavedGames,
+    resetGame
   } = useGameStore();
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showSaveModal, setShowSaveModal] = useState(false);
@@ -29,6 +31,8 @@ const GameScreen: React.FC<GameScreenProps> = () => {
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [potWinners, setPotWinners] = useState<{ [potId: string]: string[] }>({});
+  const [showNewGameModal, setShowNewGameModal] = useState(false);
+  const [startNewGameAfterSave, setStartNewGameAfterSave] = useState(false);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -49,7 +53,7 @@ const GameScreen: React.FC<GameScreenProps> = () => {
       <div className="game-screen">
         <div className="no-game">
           <h2>No Active Game</h2>
-          <button onClick={() => window.location.reload()}>Create New Game</button>
+          <button onClick={onNewGame}>Create New Game</button>
         </div>
       </div>
     );
@@ -130,6 +134,11 @@ const GameScreen: React.FC<GameScreenProps> = () => {
     setSaveName('');
     setShowSaveModal(false);
     alert('Game saved!');
+    if (startNewGameAfterSave) {
+      resetGame();
+      setStartNewGameAfterSave(false);
+      onNewGame();
+    }
   };
   
   const handleLoad = (saveId: string) => {
@@ -202,6 +211,13 @@ const GameScreen: React.FC<GameScreenProps> = () => {
             >
               📊 Stats
             </button>
+            <button
+              className="new-game-button"
+              onClick={() => setShowNewGameModal(true)}
+              title="Start new game"
+            >
+              🆕 New
+            </button>
           </div>
         </div>
 
@@ -271,9 +287,48 @@ const GameScreen: React.FC<GameScreenProps> = () => {
         </div>
       )}
 
+      {/* New Game Confirmation Modal */}
+      {showNewGameModal && (
+        <div className="modal-overlay" onClick={() => setShowNewGameModal(false)}>
+          <div className="modal-content new-game-modal" onClick={(e) => e.stopPropagation()}>
+            <h2>Start New Game?</h2>
+            <p>Would you like to save the current game before starting a new one?</p>
+            <div className="modal-actions">
+              <button
+                className="confirm-button"
+                onClick={() => {
+                  setShowNewGameModal(false);
+                  setSaveName(currentGame.name);
+                  setStartNewGameAfterSave(true);
+                  setShowSaveModal(true);
+                }}
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowNewGameModal(false);
+                  resetGame();
+                  onNewGame();
+                }}
+              >
+                Don't Save
+              </button>
+              <button onClick={() => setShowNewGameModal(false)}>Keep Playing</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Save Game Modal */}
       {showSaveModal && (
-        <div className="modal-overlay" onClick={() => setShowSaveModal(false)}>
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setShowSaveModal(false);
+            setStartNewGameAfterSave(false);
+          }}
+        >
           <div className="modal-content save-modal" onClick={(e) => e.stopPropagation()}>
             <h2>Save Game</h2>
             <input
@@ -284,7 +339,14 @@ const GameScreen: React.FC<GameScreenProps> = () => {
               className="save-name-input"
             />
             <div className="modal-actions">
-              <button onClick={() => setShowSaveModal(false)}>Cancel</button>
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setStartNewGameAfterSave(false);
+                }}
+              >
+                Cancel
+              </button>
               <button onClick={handleSave} className="confirm-button">Save</button>
             </div>
           </div>
