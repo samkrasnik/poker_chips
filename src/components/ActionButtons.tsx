@@ -114,9 +114,13 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
       </div>
 
       <div className="button-row">
-        {canCheck && (
+        {canCheck ? (
           <button className="action-button check" onClick={() => onAction(ActionType.CHECK)}>
             CHECK
+          </button>
+        ) : (
+          <button className="action-button fold" onClick={() => onAction(ActionType.FOLD)}>
+            FOLD
           </button>
         )}
 
@@ -127,33 +131,32 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
           </button>
         )}
 
-        {canBet && (
-          <button className="action-button bet" onClick={() => setShowBetModal(true)}>
-            BET
+        {(canBet || canRaise) && (
+          <button
+            className={`action-button ${canBet ? 'bet' : 'raise'}`}
+            onClick={() => {
+              if (canBet) {
+                setShowBetModal(true);
+              } else {
+                setShowRaiseModal(true);
+              }
+            }}
+          >
+            {canBet ? 'BET' : 'RAISE'}
           </button>
         )}
 
-        {canRaise && (
-          <button className="action-button raise" onClick={() => setShowRaiseModal(true)}>
-            RAISE
+        {bettingLimit !== BettingLimit.FIXED_LIMIT && (
+          <button
+            className="action-button all-in"
+            onClick={() => onAction(ActionType.ALL_IN)}
+            disabled={currentPlayer.stack === 0}
+          >
+            <span>ALL IN</span>
+            <span className="amount">${currentPlayer.stack}</span>
           </button>
         )}
-
-        <button className="action-button fold" onClick={() => onAction(ActionType.FOLD)}>
-          FOLD
-        </button>
       </div>
-
-      {bettingLimit !== BettingLimit.FIXED_LIMIT && (
-        <button 
-          className="action-button all-in" 
-          onClick={() => onAction(ActionType.ALL_IN)}
-          disabled={currentPlayer.stack === 0}
-        >
-          <span>ALL IN</span>
-          <span className="amount">${currentPlayer.stack}</span>
-        </button>
-      )}
 
       {showBetModal && (
         <div className="modal-overlay" onClick={() => setShowBetModal(false)}>
