@@ -9,6 +9,8 @@ interface SavedGame {
   name: string;
   savedAt: number;
   gameState: string;
+  gameHistory?: string[];
+  historyIndex?: number;
 }
 
 interface ActionStats {
@@ -1014,8 +1016,29 @@ const useGameStore = create<GameStore>()((set, get) => ({
       const state = get();
       if (!state.currentGame) return;
 
+      // Determine which portion of history to save
+      let historyToSave = state.gameHistory;
+      let historyIndexToSave = state.historyIndex;
+
+      if (state.currentGame.status === GameStatus.IN_PROGRESS) {
+        let lastWaiting = -1;
+        for (let i = 0; i <= state.historyIndex; i++) {
+          const h = restoreFromHistory(state.gameHistory[i]);
+          if (h.currentGame?.status === GameStatus.WAITING) {
+            lastWaiting = i;
+          }
+        }
+        historyToSave = state.gameHistory.slice(lastWaiting + 1);
+        historyIndexToSave = state.historyIndex - (lastWaiting + 1);
+      } else {
+        const currentSnapshot = state.gameHistory[state.historyIndex];
+        historyToSave = currentSnapshot ? [currentSnapshot] : [];
+        historyIndexToSave = currentSnapshot ? 0 : -1;
+      }
+
       const savedGames = get().getSavedGames();
-      const nameToUse = name || state.currentGame.name || `Saved Game ${new Date().toLocaleString()}`;
+      const nameToUse =
+        name || state.currentGame.name || `Saved Game ${new Date().toLocaleString()}`;
 
       // If a save with this name exists, overwrite it
       const existingIndex = savedGames.findIndex(sg => sg.name === nameToUse);
@@ -1026,9 +1049,14 @@ const useGameStore = create<GameStore>()((set, get) => ({
           ...existing,
           name: nameToUse,
           savedAt: Date.now(),
-          gameState: serializeGame(state.currentGame)
+          gameState: serializeGame(state.currentGame),
+          gameHistory: historyToSave,
+          historyIndex: historyIndexToSave
         };
-        localStorage.setItem(STORAGE_KEY_SAVED_GAMES, JSON.stringify(updatedGames));
+        localStorage.setItem(
+          STORAGE_KEY_SAVED_GAMES,
+          JSON.stringify(updatedGames)
+        );
         set({ savedGames: updatedGames });
         return;
       }
@@ -1043,11 +1071,16 @@ const useGameStore = create<GameStore>()((set, get) => ({
         id: Math.random().toString(36).substr(2, 9),
         name: nameToUse,
         savedAt: Date.now(),
-        gameState: serializeGame(state.currentGame)
+        gameState: serializeGame(state.currentGame),
+        gameHistory: historyToSave,
+        historyIndex: historyIndexToSave
       };
 
       const newSavedGames = [...savedGames, savedGame];
-      localStorage.setItem(STORAGE_KEY_SAVED_GAMES, JSON.stringify(newSavedGames));
+      localStorage.setItem(
+        STORAGE_KEY_SAVED_GAMES,
+        JSON.stringify(newSavedGames)
+      );
       set({ savedGames: newSavedGames });
     },
     
@@ -1060,48 +1093,105 @@ const useGameStore = create<GameStore>()((set, get) => ({
           // Ensure hand history is available before restoring
           get().loadHandHistoryFromStorage();
 
-          const restoredGame = deserializeGame(savedGame.gameState);
+          if (savedGame.gameHistory && typeof savedGame.historyIndex === 'number') {
+            const restoredState = restoreFromHistory(
+              savedGame.gameHistory[savedGame.historyIndex]
+            );
+            const restoredGame = restoredState.currentGame!;
 
-          // Sync hand number with saved hand history
-          const handsPlayed = get().handHistory.filter(
-            h => h.gameId === restoredGame.id
-          ).length;
-          restoredGame.handNumber = handsPlayed;
+            // Sync hand number with saved hand history
+            const handsPlayed = get().handHistory.filter(
+              h => h.gameId === restoredGame.id
+            ).length;
+            restoredGame.handNumber = handsPlayed;
 
-          // If the game was saved between hands, reset round counter
-          if (restoredGame.status === GameStatus.WAITING) {
-            restoredGame.currentRound = 0;
-          }
-
-          // Validate the restored game
-          if (!restoredGame.potManager || typeof restoredGame.potManager.reset !== 'function') {
-            console.error('PotManager not properly restored');
-            throw new Error('Failed to restore game state properly');
-          }
-          
-          // Validate players
-          if (restoredGame.players && restoredGame.players.length > 0) {
-            const invalidPlayer = restoredGame.players.find(p => typeof p.resetForNewHand !== 'function');
-            if (invalidPlayer) {
-              console.error('Player not properly restored:', invalidPlayer);
-              throw new Error('Failed to restore player state properly');
+            // If the game was saved between hands, reset round counter
+            if (restoredGame.status === GameStatus.WAITING) {
+              restoredGame.currentRound = 0;
             }
+
+            // Validate the restored game
+            if (
+              !restoredGame.potManager ||
+              typeof restoredGame.potManager.reset !== 'function'
+            ) {
+              console.error('PotManager not properly restored');
+              throw new Error('Failed to restore game state properly');
+            }
+
+            // Validate players
+            if (restoredGame.players && restoredGame.players.length > 0) {
+              const invalidPlayer = restoredGame.players.find(
+                p => typeof p.resetForNewHand !== 'function'
+              );
+              if (invalidPlayer) {
+                console.error('Player not properly restored:', invalidPlayer);
+                throw new Error('Failed to restore player state properly');
+              }
+            }
+
+            set({
+              currentGame: restoredGame,
+              gameHistory: savedGame.gameHistory,
+              historyIndex: savedGame.historyIndex,
+              playerStats: new Map(restoredState.playerStats),
+              handHistory: restoredState.handHistory,
+              stacksBeforeHand: restoredState.stacksBeforeHand
+                ? new Map(restoredState.stacksBeforeHand)
+                : null,
+              currentHandStats: restoredState.currentHandStats
+                ? new Map(restoredState.currentHandStats)
+                : null
+            });
+          } else {
+            const restoredGame = deserializeGame(savedGame.gameState);
+
+            // Sync hand number with saved hand history
+            const handsPlayed = get().handHistory.filter(
+              h => h.gameId === restoredGame.id
+            ).length;
+            restoredGame.handNumber = handsPlayed;
+
+            // If the game was saved between hands, reset round counter
+            if (restoredGame.status === GameStatus.WAITING) {
+              restoredGame.currentRound = 0;
+            }
+
+            // Validate the restored game
+            if (
+              !restoredGame.potManager ||
+              typeof restoredGame.potManager.reset !== 'function'
+            ) {
+              console.error('PotManager not properly restored');
+              throw new Error('Failed to restore game state properly');
+            }
+
+            // Validate players
+            if (restoredGame.players && restoredGame.players.length > 0) {
+              const invalidPlayer = restoredGame.players.find(
+                p => typeof p.resetForNewHand !== 'function'
+              );
+              if (invalidPlayer) {
+                console.error('Player not properly restored:', invalidPlayer);
+                throw new Error('Failed to restore player state properly');
+              }
+            }
+
+            const state = get();
+            const snapshot: HistoryState = {
+              currentGame: restoredGame,
+              playerStats: state.playerStats,
+              handHistory: state.handHistory,
+              stacksBeforeHand: state.stacksBeforeHand,
+              currentHandStats: state.currentHandStats
+            };
+            const newHistory = [saveToHistory(snapshot)];
+            set({
+              currentGame: restoredGame,
+              gameHistory: newHistory,
+              historyIndex: 0
+            });
           }
-          
-          const state = get();
-          const snapshot: HistoryState = {
-            currentGame: restoredGame,
-            playerStats: state.playerStats,
-            handHistory: state.handHistory,
-            stacksBeforeHand: state.stacksBeforeHand,
-            currentHandStats: state.currentHandStats
-          };
-          const newHistory = [saveToHistory(snapshot)];
-          set({
-            currentGame: restoredGame,
-            gameHistory: newHistory,
-            historyIndex: 0
-          });
         } catch (error) {
           console.error('Failed to load game:', error);
           alert('Failed to load saved game. The save file may be corrupted.');
