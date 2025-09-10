@@ -39,6 +39,35 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
     setPlayers(newPlayers);
   };
 
+  const handlePrefill = () => {
+    const savedGames = getSavedGames();
+    if (savedGames.length === 0) return;
+
+    const lastGame = savedGames[savedGames.length - 1];
+    try {
+      const gameData = JSON.parse(lastGame.gameState);
+      setGameName(gameData.name || '');
+      setMaxPlayers(gameData.maxPlayers?.toString() || '9');
+      setStartingStack(gameData.startingStack?.toString() || '1000');
+      setSmallBlind(gameData.smallBlind?.toString() || '5');
+      setBigBlind(gameData.bigBlind?.toString() || '10');
+      setAnte(gameData.ante?.toString() || '0');
+      setBettingLimit(gameData.bettingLimit || BettingLimit.NO_LIMIT);
+      setTotalRounds(gameData.totalRounds?.toString() || '4');
+
+      if (Array.isArray(gameData.players)) {
+        setPlayers(
+          gameData.players.map((p: any) => ({
+            name: p.name || '',
+            stack: p.stack?.toString() || ''
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to prefill from last saved game', err);
+    }
+  };
+
   const handleLoad = (saveId: string) => {
     loadGame(saveId);
     onGameCreated();
@@ -80,9 +109,14 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
       <div className="setup-header">
         <h1>New Game Setup</h1>
         {getSavedGames().length > 0 && (
-          <button className="load-game-button" onClick={() => setShowLoadModal(true)}>
-            📁 Load Saved Game
-          </button>
+          <>
+            <button className="prefill-button" onClick={handlePrefill}>
+              🔄 Use Last Game
+            </button>
+            <button className="load-game-button" onClick={() => setShowLoadModal(true)}>
+              📁 Load Saved Game
+            </button>
+          </>
         )}
       </div>
       
