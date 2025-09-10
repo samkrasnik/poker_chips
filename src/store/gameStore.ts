@@ -549,18 +549,19 @@ const useGameStore = create<GameStore>()((set, get) => ({
           }
         }
         
-        // Store stacks before action for profit tracking
+        // Store state before action for profit tracking and winner detection
         const stacksBefore = new Map(game.players.map(p => [p.id, p.stack]));
+        const playersBefore = game.getPlayersInHand();
         const statusBefore = game.status;
-        
+
         game.performAction(playerId, action, amount || 0);
-        
+
         const handEnded = statusBefore === GameStatus.IN_PROGRESS && game.status === GameStatus.WAITING;
         let updatedHandHistory = state.handHistory;
         let newCurrentHandStats = state.currentHandStats;
         if (handEnded) {
-          // Hand ended due to everyone folding - find the winner
-          const remainingPlayers = game.getPlayersInHand();
+          // Hand ended due to everyone folding - determine winner before reset
+          const remainingPlayers = playersBefore.filter(p => p.id !== playerId);
           const winnerIds = remainingPlayers.map(p => p.id);
           if (winnerIds.length === 1) {
             const winner = remainingPlayers[0];
