@@ -5,7 +5,13 @@
  * Tests No Limit, Pot Limit, and Fixed Limit poker betting rules
  */
 
-import puppeteer from 'puppeteer';
+let puppeteer;
+try {
+  puppeteer = (await import('puppeteer')).default;
+} catch {
+  console.warn('Skipping test-betting-limits.mjs: puppeteer not installed');
+  process.exit(0);
+}
 
 async function delay(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
