@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { ActionType, BettingLimit } from '../models/Game';
 import { Player } from '../models/Player';
+import { calculatePotSizeRaise } from '../utils/betUtils';
 import './ActionButtons.css';
 
 interface ActionButtonsProps {
@@ -64,9 +65,9 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     
     // Calculate max raise based on betting limit
     if (bettingLimit === BettingLimit.POT_LIMIT) {
-      // In pot limit, max raise is pot size after calling
-      const potAfterCall = potSize + (currentBet - currentPlayer.currentBet);
-      maxRaise = Math.min(currentBet + potAfterCall, currentPlayer.stack + currentPlayer.currentBet);
+      // In pot limit, max raise is a pot-sized raise
+      const potRaise = calculatePotSizeRaise(potSize, currentBet);
+      maxRaise = Math.min(potRaise, currentPlayer.stack + currentPlayer.currentBet);
     } else if (bettingLimit === BettingLimit.FIXED_LIMIT) {
       // In fixed limit, raise is exactly minRaise (or all-in if less)
       maxRaise = Math.min(currentBet + minRaise, currentPlayer.stack + currentPlayer.currentBet);
@@ -221,18 +222,25 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                 <div className="quick-bets">
                   {bettingLimit === BettingLimit.POT_LIMIT ? (
                     <>
-                      <button 
+                      <button
                         className="quick-bet-button pot-raise"
                         onClick={() => {
-                          const potAfterCall = potSize + (currentBet - currentPlayer.currentBet);
-                          const potRaise = currentBet + potAfterCall;
+                          const potRaise = calculatePotSizeRaise(
+                            potSize,
+                            currentBet
+                          );
                           setRaiseAmount(potRaise.toString());
                         }}
                       >
                         <span className="quick-bet-label">POT</span>
                         <span className="quick-bet-amount">
-                          ${Math.min(currentBet + potSize + (currentBet - currentPlayer.currentBet), 
-                                     currentPlayer.stack + currentPlayer.currentBet)}
+                          ${Math.min(
+                            calculatePotSizeRaise(
+                              potSize,
+                              currentBet
+                            ),
+                            currentPlayer.stack + currentPlayer.currentBet
+                          )}
                         </span>
                       </button>
                     </>
@@ -251,9 +259,11 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                   value={raiseAmount}
                   onChange={e => setRaiseAmount(e.target.value)}
                   placeholder={`Min: ${Math.min(currentBet + minRaise, currentPlayer.stack + currentPlayer.currentBet)}, Max: ${
-                    bettingLimit === BettingLimit.POT_LIMIT 
-                      ? Math.min(currentBet + potSize + (currentBet - currentPlayer.currentBet), 
-                                 currentPlayer.stack + currentPlayer.currentBet)
+                    bettingLimit === BettingLimit.POT_LIMIT
+                      ? Math.min(
+                          calculatePotSizeRaise(potSize, currentBet),
+                          currentPlayer.stack + currentPlayer.currentBet
+                        )
                       : currentPlayer.stack + currentPlayer.currentBet
                   }`}
                   autoFocus
