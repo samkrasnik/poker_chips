@@ -908,11 +908,25 @@ const useGameStore = create<GameStore>()((set, get) => ({
     loadGame: (saveId: string) => {
       const savedGames = get().getSavedGames();
       const savedGame = savedGames.find(sg => sg.id === saveId);
-      
+
       if (savedGame) {
         try {
+          // Ensure hand history is available before restoring
+          get().loadHandHistoryFromStorage();
+
           const restoredGame = deserializeGame(savedGame.gameState);
-          
+
+          // Sync hand number with saved hand history
+          const handsPlayed = get().handHistory.filter(
+            h => h.gameId === restoredGame.id
+          ).length;
+          restoredGame.handNumber = handsPlayed;
+
+          // If the game was saved between hands, reset round counter
+          if (restoredGame.status === GameStatus.WAITING) {
+            restoredGame.currentRound = 0;
+          }
+
           // Validate the restored game
           if (!restoredGame.potManager || typeof restoredGame.potManager.reset !== 'function') {
             console.error('PotManager not properly restored');

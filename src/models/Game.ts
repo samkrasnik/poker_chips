@@ -595,7 +595,10 @@ export class Game {
     
     // Reset game status
     this.status = GameStatus.WAITING;
-    
+
+    // Prepare for next hand
+    this.currentRound = 0;
+
     // Reset pot manager after distribution
     this.potManager.reset();
     
@@ -636,7 +639,10 @@ export class Game {
     
     // Reset game status
     this.status = GameStatus.WAITING;
-    
+
+    // Prepare for next hand
+    this.currentRound = 0;
+
     // Reset pot manager after distribution
     this.potManager.reset();
     
