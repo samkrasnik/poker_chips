@@ -112,16 +112,14 @@
 
 .action-button.all-in {
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  width: 60%;
-  max-width: 250px;
-  margin: 20px auto 0;
+  margin-left: 20px;
+  padding: 12px 32px;
 }
 
 @media (max-width: 412px) {
   .action-button.all-in {
-    width: 80%;
-    max-width: 80%;
-    margin-top: 15px;
+    margin-left: 15px;
+    padding: 8px 20px;
   }
 }
 
