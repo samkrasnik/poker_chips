@@ -163,7 +163,7 @@ const deserializeGame = (gameString: string): Game => {
       return player;
     });
   }
-  
+
   // Recreate PotManager instance with proper prototype
   const potManager = new PotManager();
   if (gameData.potManager) {
@@ -181,7 +181,20 @@ const deserializeGame = (gameString: string): Game => {
     }
   }
   game.potManager = potManager;
-  
+
+  // Ensure dealer information is preserved
+  if (game.players && game.players.length > 0) {
+    const dealerIndex = game.players.findIndex(p => p.isDealer);
+    if (dealerIndex >= 0) {
+      game.dealerPosition = dealerIndex;
+    } else if (typeof game.dealerPosition === 'number' && game.players[game.dealerPosition]) {
+      game.players[game.dealerPosition].isDealer = true;
+    } else {
+      game.players[0].isDealer = true;
+      game.dealerPosition = 0;
+    }
+  }
+
   return game;
 };
 
