@@ -163,18 +163,18 @@
 .pot-container {
   background: #2a2a2a;
   border-radius: 8px;
-  padding: 15px 20px;
+  padding: 10px 20px;
   margin-bottom: 20px;
   text-align: center;
-  position: sticky;
   position: -webkit-sticky;
+  position: sticky;
   top: 0;
   z-index: 100;
 }
 
 @media (max-width: 412px) {
   .pot-container {
-    padding: 10px 12px;
+    padding: 8px 12px;
     margin-bottom: 12px;
   }
 }

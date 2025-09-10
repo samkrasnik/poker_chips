@@ -85,12 +85,18 @@
 .action-button .amount {
   font-size: 12px;
   opacity: 0.9;
+  min-height: 1em;
+  display: block;
 }
 
 @media (max-width: 412px) {
   .action-button .amount {
     font-size: 10px;
   }
+}
+
+.action-button.fold .amount {
+  visibility: hidden;
 }
 
 .action-button.check {
