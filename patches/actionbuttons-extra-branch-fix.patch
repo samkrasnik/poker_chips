@@ -1,0 +1,27 @@
+From cd6f1365097d38e4100b52b6ef6be54f3e335827 Mon Sep 17 00:00:00 2001
+From: samkrasnik <108192571+samkrasnik@users.noreply.github.com>
+Date: Tue, 9 Sep 2025 21:48:56 -0400
+Subject: [PATCH] fix: remove extra conditional branch in action buttons
+
+---
+ src/components/ActionButtons.tsx | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/src/components/ActionButtons.tsx b/src/components/ActionButtons.tsx
+index fc5e0b4..48ade99 100644
+--- a/src/components/ActionButtons.tsx
++++ b/src/components/ActionButtons.tsx
+@@ -124,10 +124,6 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
+             <span>FOLD</span>
+             <span className="amount">&nbsp;</span>
+           </button>
+-        ) : (
+-          <button className="action-button fold" onClick={() => onAction(ActionType.FOLD)}>
+-            FOLD
+-          </button>
+         )}
+ 
+         {canCall && (
+-- 
+2.43.0
+
