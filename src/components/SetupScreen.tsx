@@ -46,7 +46,8 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
     const lastGame = savedGames[savedGames.length - 1];
     try {
       const gameData = JSON.parse(lastGame.gameState);
-      setGameName(gameData.name || '');
+      // Always start a fresh game name when prefilling
+      setGameName(`Game ${new Date().toLocaleDateString()}`);
       setMaxPlayers(gameData.maxPlayers?.toString() || '9');
       setStartingStack(gameData.startingStack?.toString() || '1000');
       setSmallBlind(gameData.smallBlind?.toString() || '5');
@@ -59,7 +60,8 @@ const SetupScreen: React.FC<SetupScreenProps> = ({ onGameCreated }) => {
         setPlayers(
           gameData.players.map((p: any) => ({
             name: p.name || '',
-            stack: p.stack?.toString() || ''
+            // Don't carry over stack amounts from last game
+            stack: ''
           }))
         );
       }
