@@ -23,7 +23,7 @@ function App() {
       {currentScreen === 'setup' ? (
         <SetupScreen onGameCreated={() => setCurrentScreen('game')} />
       ) : (
-        <GameScreen />
+        <GameScreen onNewGame={() => setCurrentScreen('setup')} />
       )}
     </div>
   );
