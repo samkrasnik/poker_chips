@@ -153,82 +153,84 @@ const GameScreen: React.FC<GameScreenProps> = () => {
 
   return (
     <div className="game-screen">
-      <div className="game-header">
-        <div className="header-left">
-          <button 
-            className="undo-button" 
-            onClick={handleUndo}
-            disabled={!canUndo()}
-            title="Undo last action"
-          >
-            ↶ Undo
-          </button>
-        </div>
-        <div className="header-center">
-          <h1>{currentGame.name}</h1>
-          <div className="game-info">
-            <span>Hand #{currentGame.handNumber}</span>
-            {currentGame.status === GameStatus.IN_PROGRESS && (
-              <span>
-                Round {currentGame.currentRound + 1}/{currentGame.totalRounds}
-              </span>
-            )}
-            <span>Blinds: {currentGame.smallBlind}/{currentGame.bigBlind}</span>
+      <div className="top-bar">
+        <div className="game-header">
+          <div className="header-left">
+            <button
+              className="undo-button"
+              onClick={handleUndo}
+              disabled={!canUndo()}
+              title="Undo last action"
+            >
+              ↶ Undo
+            </button>
+          </div>
+          <div className="header-center">
+            <h1>{currentGame.name}</h1>
+            <div className="game-info">
+              <span>Hand #{currentGame.handNumber}</span>
+              {currentGame.status === GameStatus.IN_PROGRESS && (
+                <span>
+                  Round {currentGame.currentRound + 1}/{currentGame.totalRounds}
+                </span>
+              )}
+              <span>Blinds: {currentGame.smallBlind}/{currentGame.bigBlind}</span>
+            </div>
+          </div>
+          <div className="header-right">
+            <button
+              className="save-button"
+              onClick={() => {
+                setSaveName(currentGame.name);
+                setShowSaveModal(true);
+              }}
+              title="Save game"
+            >
+              💾 Save
+            </button>
+            <button
+              className="load-button"
+              onClick={() => setShowLoadModal(true)}
+              title="Load game"
+            >
+              📁 Load
+            </button>
+            <button
+              className="stats-button"
+              onClick={() => setShowStatsModal(true)}
+              title="View stats"
+            >
+              📊 Stats
+            </button>
           </div>
         </div>
-        <div className="header-right">
-          <button 
-            className="save-button" 
-            onClick={() => {
-              setSaveName(currentGame.name);
-              setShowSaveModal(true);
-            }}
-            title="Save game"
-          >
-            💾 Save
-          </button>
-          <button 
-            className="load-button" 
-            onClick={() => setShowLoadModal(true)}
-            title="Load game"
-          >
-            📁 Load
-          </button>
-          <button 
-            className="stats-button" 
-            onClick={() => setShowStatsModal(true)}
-            title="View stats"
-          >
-            📊 Stats
-          </button>
-        </div>
-      </div>
 
-      <div className="pot-container">
-        <div className="main-pot">
-          <h2>Total Pot: ${potTotal}</h2>
+        <div className="pot-container">
+          <div className="main-pot">
+            <h2>Total Pot: ${potTotal}</h2>
+          </div>
+          {currentGame.status === GameStatus.IN_PROGRESS && (
+            <div className="betting-round-indicator">
+              <span className="round-label">BETTING ROUND</span>
+              <span className="round-number">{currentGame.currentRound + 1}</span>
+              <span className="round-name">
+                {currentGame.currentRound === 0 && '(Pre-flop)'}
+                {currentGame.currentRound === 1 && '(Flop)'}
+                {currentGame.currentRound === 2 && '(Turn)'}
+                {currentGame.currentRound === 3 && '(River)'}
+              </span>
+            </div>
+          )}
+          {pots.length > 1 && (
+            <div className="side-pots">
+              {pots.map((pot, index) => (
+                <div key={pot.id} className="side-pot">
+                  {pot.isMain ? 'Main' : `Side ${index}`}: ${pot.amount}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
-        {currentGame.status === GameStatus.IN_PROGRESS && (
-          <div className="betting-round-indicator">
-            <span className="round-label">BETTING ROUND</span>
-            <span className="round-number">{currentGame.currentRound + 1}</span>
-            <span className="round-name">
-              {currentGame.currentRound === 0 && '(Pre-flop)'}
-              {currentGame.currentRound === 1 && '(Flop)'}
-              {currentGame.currentRound === 2 && '(Turn)'}
-              {currentGame.currentRound === 3 && '(River)'}
-            </span>
-          </div>
-        )}
-        {pots.length > 1 && (
-          <div className="side-pots">
-            {pots.map((pot, index) => (
-              <div key={pot.id} className="side-pot">
-                {pot.isMain ? 'Main' : `Side ${index}`}: ${pot.amount}
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div className="players-container">
