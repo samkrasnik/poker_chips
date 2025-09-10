@@ -185,13 +185,50 @@ const deserializeGame = (gameString: string): Game => {
   return game;
 };
 
-const saveToHistory = (game: Game | null): string => {
-  return serializeGame(game as Game);
+interface HistoryState {
+  currentGame: Game | null;
+  playerStats: Map<string, PlayerStats>;
+  handHistory: HandHistoryEntry[];
+  stacksBeforeHand: Map<string, number> | null;
+  currentHandStats: Map<string, HandTempStats> | null;
+}
+
+const saveToHistory = (state: HistoryState): string => {
+  return JSON.stringify({
+    currentGame: state.currentGame ? serializeGame(state.currentGame) : null,
+    playerStats: Array.from(state.playerStats.entries()),
+    handHistory: state.handHistory,
+    stacksBeforeHand: state.stacksBeforeHand
+      ? Array.from(state.stacksBeforeHand.entries())
+      : null,
+    currentHandStats: state.currentHandStats
+      ? Array.from(state.currentHandStats.entries())
+      : null
+  });
 };
 
-const restoreFromHistory = (historyItem: string): Game | null => {
-  if (!historyItem) return null;
-  return deserializeGame(historyItem);
+const restoreFromHistory = (historyItem: string): HistoryState => {
+  if (!historyItem) {
+    return {
+      currentGame: null,
+      playerStats: new Map(),
+      handHistory: [],
+      stacksBeforeHand: null,
+      currentHandStats: null
+    };
+  }
+  const data = JSON.parse(historyItem);
+  return {
+    currentGame: data.currentGame ? deserializeGame(data.currentGame) : null,
+    playerStats: new Map(data.playerStats || []),
+    handHistory: data.handHistory || [],
+    stacksBeforeHand: data.stacksBeforeHand
+      ? new Map(data.stacksBeforeHand)
+      : null,
+    currentHandStats: data.currentHandStats
+      ? new Map(data.currentHandStats)
+      : null
+  };
 };
 
 const useGameStore = create<GameStore>()((set, get) => ({
@@ -207,8 +244,15 @@ const useGameStore = create<GameStore>()((set, get) => ({
     createNewGame: (config: GameConfig) => {
       const newGame = new Game(config);
       const state = get();
-      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(newGame)];
-      set({ 
+      const snapshot: HistoryState = {
+        currentGame: newGame,
+        playerStats: state.playerStats,
+        handHistory: state.handHistory,
+        stacksBeforeHand: state.stacksBeforeHand,
+        currentHandStats: state.currentHandStats
+      };
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
+      set({
         currentGame: newGame,
         gameHistory: newHistory.slice(-MAX_HISTORY),
         historyIndex: newHistory.length - 1
@@ -223,12 +267,19 @@ const useGameStore = create<GameStore>()((set, get) => ({
     addPlayer: (name: string, seatNumber?: number, stack?: number) => {
       const game = get().currentGame;
       if (!game) return;
-      
+
       try {
         game.addPlayer(name, seatNumber || null, stack || null);
         const state = get();
-        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({ 
+        const snapshot: HistoryState = {
+          currentGame: game,
+          playerStats: state.playerStats,
+          handHistory: state.handHistory,
+          stacksBeforeHand: state.stacksBeforeHand,
+          currentHandStats: state.currentHandStats
+        };
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
+        set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
           historyIndex: newHistory.length - 1
@@ -242,12 +293,19 @@ const useGameStore = create<GameStore>()((set, get) => ({
     removePlayer: (playerId: string) => {
       const game = get().currentGame;
       if (!game) return;
-      
+
       try {
         game.removePlayer(playerId);
         const state = get();
-        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({ 
+        const snapshot: HistoryState = {
+          currentGame: game,
+          playerStats: state.playerStats,
+          handHistory: state.handHistory,
+          stacksBeforeHand: state.stacksBeforeHand,
+          currentHandStats: state.currentHandStats
+        };
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
+        set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
           historyIndex: newHistory.length - 1
@@ -338,7 +396,14 @@ const useGameStore = create<GameStore>()((set, get) => ({
         // Store the stacks before hand starts
         game.startHand();
 
-        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        const snapshot: HistoryState = {
+          currentGame: game,
+          playerStats: new Map(state.playerStats),
+          handHistory: state.handHistory,
+          stacksBeforeHand,
+          currentHandStats: handStats
+        };
+        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
         set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
@@ -542,13 +607,24 @@ const useGameStore = create<GameStore>()((set, get) => ({
           get().saveHandHistoryToStorage();
         }
 
-        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+        const snapshot: HistoryState = {
+          currentGame: game,
+          playerStats: new Map(state.playerStats),
+          handHistory: updatedHandHistory,
+          stacksBeforeHand: handEnded ? null : state.stacksBeforeHand,
+          currentHandStats: newCurrentHandStats
+        };
+        const serialized = saveToHistory(snapshot);
+        const newHistory = handEnded
+          ? [serialized]
+          : [...state.gameHistory.slice(0, state.historyIndex + 1), serialized];
         set({
           currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
           gameHistory: newHistory.slice(-MAX_HISTORY),
-          historyIndex: newHistory.length - 1,
+          historyIndex: handEnded ? 0 : newHistory.length - 1,
           playerStats: new Map(state.playerStats),
           handHistory: updatedHandHistory,
+          stacksBeforeHand: handEnded ? null : state.stacksBeforeHand,
           currentHandStats: newCurrentHandStats
         });
       } catch (error) {
@@ -624,13 +700,21 @@ const useGameStore = create<GameStore>()((set, get) => ({
 
         const updatedHandHistory = [...state.handHistory, handEntry].slice(-MAX_HAND_HISTORY);
 
-        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({
-          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
-          gameHistory: newHistory.slice(-MAX_HISTORY),
-          historyIndex: newHistory.length - 1,
+        const snapshot: HistoryState = {
+          currentGame: game,
           playerStats: new Map(state.playerStats),
           handHistory: updatedHandHistory,
+          stacksBeforeHand: null,
+          currentHandStats: null
+        };
+        const serialized = saveToHistory(snapshot);
+        set({
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: [serialized],
+          historyIndex: 0,
+          playerStats: new Map(state.playerStats),
+          handHistory: updatedHandHistory,
+          stacksBeforeHand: null,
           currentHandStats: null
         });
 
@@ -713,13 +797,21 @@ const useGameStore = create<GameStore>()((set, get) => ({
 
         const updatedHandHistory = [...state.handHistory, handEntry].slice(-MAX_HAND_HISTORY);
 
-        const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-        set({
-          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
-          gameHistory: newHistory.slice(-MAX_HISTORY),
-          historyIndex: newHistory.length - 1,
+        const snapshot: HistoryState = {
+          currentGame: game,
           playerStats: new Map(state.playerStats),
           handHistory: updatedHandHistory,
+          stacksBeforeHand: null,
+          currentHandStats: null
+        };
+        const serialized = saveToHistory(snapshot);
+        set({
+          currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
+          gameHistory: [serialized],
+          historyIndex: 0,
+          playerStats: new Map(state.playerStats),
+          handHistory: updatedHandHistory,
+          stacksBeforeHand: null,
           currentHandStats: null
         });
 
@@ -756,8 +848,15 @@ const useGameStore = create<GameStore>()((set, get) => ({
       }
       
       const state = get();
-      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
-      set({ 
+      const snapshot: HistoryState = {
+        currentGame: game,
+        playerStats: state.playerStats,
+        handHistory: state.handHistory,
+        stacksBeforeHand: state.stacksBeforeHand,
+        currentHandStats: state.currentHandStats
+      };
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
+      set({
         currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
         gameHistory: newHistory.slice(-MAX_HISTORY),
         historyIndex: newHistory.length - 1
@@ -784,7 +883,14 @@ const useGameStore = create<GameStore>()((set, get) => ({
       }
       
       const state = get();
-      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      const snapshot: HistoryState = {
+        currentGame: game,
+        playerStats: state.playerStats,
+        handHistory: state.handHistory,
+        stacksBeforeHand: state.stacksBeforeHand,
+        currentHandStats: state.currentHandStats
+      };
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
       set({
         currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
         gameHistory: newHistory.slice(-MAX_HISTORY),
@@ -810,7 +916,14 @@ const useGameStore = create<GameStore>()((set, get) => ({
       }
 
       const state = get();
-      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      const snapshot: HistoryState = {
+        currentGame: game,
+        playerStats: state.playerStats,
+        handHistory: state.handHistory,
+        stacksBeforeHand: state.stacksBeforeHand,
+        currentHandStats: state.currentHandStats
+      };
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
       set({
         currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
         gameHistory: newHistory.slice(-MAX_HISTORY),
@@ -831,7 +944,14 @@ const useGameStore = create<GameStore>()((set, get) => ({
       game.setDealerButton(playerId);
 
       const state = get();
-      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(game)];
+      const snapshot: HistoryState = {
+        currentGame: game,
+        playerStats: state.playerStats,
+        handHistory: state.handHistory,
+        stacksBeforeHand: state.stacksBeforeHand,
+        currentHandStats: state.currentHandStats
+      };
+      const newHistory = [...state.gameHistory.slice(0, state.historyIndex + 1), saveToHistory(snapshot)];
       set({
         currentGame: Object.assign(Object.create(Object.getPrototypeOf(game)), game),
         gameHistory: newHistory.slice(-MAX_HISTORY),
@@ -851,9 +971,22 @@ const useGameStore = create<GameStore>()((set, get) => ({
       const state = get();
       if (state.historyIndex > 0) {
         const newIndex = state.historyIndex - 1;
-        const restoredGame = restoreFromHistory(state.gameHistory[newIndex]);
+        const restored = restoreFromHistory(state.gameHistory[newIndex]);
         set({
-          currentGame: restoredGame,
+          currentGame: restored.currentGame
+            ? Object.assign(
+                Object.create(Object.getPrototypeOf(restored.currentGame)),
+                restored.currentGame
+              )
+            : null,
+          playerStats: new Map(restored.playerStats),
+          handHistory: restored.handHistory,
+          stacksBeforeHand: restored.stacksBeforeHand
+            ? new Map(restored.stacksBeforeHand)
+            : null,
+          currentHandStats: restored.currentHandStats
+            ? new Map(restored.currentHandStats)
+            : null,
           historyIndex: newIndex
         });
       }
@@ -942,7 +1075,15 @@ const useGameStore = create<GameStore>()((set, get) => ({
             }
           }
           
-          const newHistory = [saveToHistory(restoredGame)];
+          const state = get();
+          const snapshot: HistoryState = {
+            currentGame: restoredGame,
+            playerStats: state.playerStats,
+            handHistory: state.handHistory,
+            stacksBeforeHand: state.stacksBeforeHand,
+            currentHandStats: state.currentHandStats
+          };
+          const newHistory = [saveToHistory(snapshot)];
           set({
             currentGame: restoredGame,
             gameHistory: newHistory,
