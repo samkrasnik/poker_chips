@@ -76,9 +76,10 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
             value={range}
             onChange={(e) => setRange(e.target.value)}
           >
-            <option value="all">All Hands</option>
+            <option value="10">Last 10 Hands</option>
+            <option value="50">Last 50 Hands</option>
             <option value="100">Last 100 Hands</option>
-            <option value="500">Last 500 Hands</option>
+            <option value="all">All Hands</option>
           </select>
         </div>
         
