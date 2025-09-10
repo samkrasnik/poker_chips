@@ -100,6 +100,12 @@ export class Game {
 
     this.players.push(player);
     this.sortPlayersBySeat();
+    if (this.players.length >= 2 && !this.players.some(p => p.isDealer)) {
+      this.players[1].isDealer = true;
+      this.dealerPosition = 1;
+    } else {
+      this.dealerPosition = this.players.findIndex(p => p.isDealer);
+    }
     return player;
   }
 
@@ -184,7 +190,7 @@ export class Game {
       }
     });
 
-    if (this.handNumber === 1) {
+    if (!this.players.some(p => p.isDealer)) {
       this.moveDealerButton();
     }
     this.postBlindsAndAntes();

@@ -7,7 +7,11 @@ describe('Dealer button movement', () => {
     const bob = game.addPlayer('Bob', 2);
     const carol = game.addPlayer('Carol', 3);
 
-    // First hand starts with Bob as dealer
+    // Dealer should be set before first hand starts (Bob)
+    expect(game.dealerPosition).toBe(1);
+    expect(bob.isDealer).toBe(true);
+
+    // Starting the first hand shouldn't change dealer
     game.startHand();
 
     expect(game.dealerPosition).toBe(1);
