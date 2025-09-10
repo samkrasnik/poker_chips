@@ -32,7 +32,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
   const canCall = currentBet > currentPlayer.currentBet && currentPlayer.stack > 0;
   const canBet = currentBet === 0 && currentPlayer.stack >= Math.min(minBet, currentPlayer.stack);
   const canRaise = currentBet > 0 && currentPlayer.stack > (currentBet - currentPlayer.currentBet);
-  const callAmount = Math.min(currentBet - currentPlayer.currentBet, currentPlayer.stack);
+  const callAmount = Math.max(0, Math.min(currentBet - currentPlayer.currentBet, currentPlayer.stack));
 
   const handleBet = () => {
     const amount = parseInt(betAmount);
@@ -66,7 +66,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
     // Calculate max raise based on betting limit
     if (bettingLimit === BettingLimit.POT_LIMIT) {
       // In pot limit, max raise is a pot-sized raise
-      const potRaise = calculatePotSizeRaise(potSize, currentBet);
+      const potRaise = calculatePotSizeRaise(potSize, currentBet, callAmount);
       maxRaise = Math.min(potRaise, currentPlayer.stack + currentPlayer.currentBet);
     } else if (bettingLimit === BettingLimit.FIXED_LIMIT) {
       // In fixed limit, raise is exactly minRaise (or all-in if less)
@@ -227,7 +227,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                         onClick={() => {
                           const potRaise = calculatePotSizeRaise(
                             potSize,
-                            currentBet
+                            currentBet,
+                            callAmount
                           );
                           setRaiseAmount(potRaise.toString());
                         }}
@@ -237,7 +238,8 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                           ${Math.min(
                             calculatePotSizeRaise(
                               potSize,
-                              currentBet
+                              currentBet,
+                              callAmount
                             ),
                             currentPlayer.stack + currentPlayer.currentBet
                           )}
@@ -261,7 +263,7 @@ const ActionButtons: React.FC<ActionButtonsProps> = ({
                   placeholder={`Min: ${Math.min(currentBet + minRaise, currentPlayer.stack + currentPlayer.currentBet)}, Max: ${
                     bettingLimit === BettingLimit.POT_LIMIT
                       ? Math.min(
-                          calculatePotSizeRaise(potSize, currentBet),
+                          calculatePotSizeRaise(potSize, currentBet, callAmount),
                           currentPlayer.stack + currentPlayer.currentBet
                         )
                       : currentPlayer.stack + currentPlayer.currentBet
