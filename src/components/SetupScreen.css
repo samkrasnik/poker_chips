@@ -53,8 +53,25 @@
   white-space: nowrap;
 }
 
+.prefill-button {
+  padding: 10px 20px;
+  background: #607D8B;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background 0.2s;
+  white-space: nowrap;
+}
+
 @media (max-width: 412px) {
   .load-game-button {
+    padding: 8px 12px;
+    font-size: 12px;
+  }
+
+  .prefill-button {
     padding: 8px 12px;
     font-size: 12px;
   }
@@ -62,6 +79,10 @@
 
 .load-game-button:hover {
   background: #7B1FA2;
+}
+
+.prefill-button:hover {
+  background: #455A64;
 }
 
 .form-section {
