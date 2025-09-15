@@ -50,7 +50,9 @@ const StatsModal: React.FC<StatsModalProps> = ({ show, onClose }) => {
   const historyBase = scope === 'all'
     ? handHistory
     : handHistory.filter((h: HandDetailsEntry) => h.gameId === currentGame?.id);
-  const history: HandDetailsEntry[] = lastN ? historyBase.slice(-lastN) : historyBase;
+  const history: HandDetailsEntry[] = lastN
+    ? historyBase.slice(-lastN).reverse()
+    : [...historyBase].reverse();
   
   return (
     <div className="modal-overlay" onClick={onClose}>
